@@ -1,0 +1,19 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "polyscope",
+    srcs = glob(
+        ["src/**/*.cpp"],
+    ),
+    hdrs = glob(
+        [
+            "include/**/*.h",
+            "include/**/*.ipp",
+        ],
+    ),
+    strip_include_prefix = "include",
+    deps = [
+        "@imgui",
+        "@stb",
+    ],
+)
