@@ -13,7 +13,9 @@ cc_library(
     ),
     strip_include_prefix = "include",
     deps = [
+        "//deps/json",
         "@imgui",
         "@stb",
+        "@glm",
     ],
 )

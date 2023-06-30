@@ -9,14 +9,18 @@ http_archive(
 
 http_archive(
     name = "imgui",
-    build_file_content =
-        """
+    build_file_content = """
 # from https://stackoverflow.com/a/68435053
 cc_library(
     name = 'imgui',
-    srcs = glob(['*.cpp']),
+    srcs = glob(
+        ['**/*.cpp'],
+        exclude = [
+            'examples/**',
+        ]
+    ),
     includes = ['.'],
-    hdrs = glob(['*.h']),
+    hdrs = glob(['**/*.h']),
     visibility = ['//visibility:public'],
 )
 """,
@@ -42,8 +46,7 @@ cc_library(
 git_repository(
     name = "stb",
     branch = "master",
-    build_file_content =
-        """
+    build_file_content = """
 cc_library(
     name = 'stb',
     srcs = [],
@@ -53,4 +56,19 @@ cc_library(
 )
 """,
     remote = "https://github.com/nothings/stb.git",
+)
+
+git_repository(
+    name = "glm",
+    branch = "master",
+    build_file_content = """
+cc_library(
+    name = 'glm',
+    srcs = [],
+    includes = ['.'],
+    hdrs = glob(['glm/**/*.hpp', 'glm/**/*.h', 'glm/**/*.inl']),
+    visibility = ['//visibility:public'],
+)
+""",
+    remote = "https://github.com/g-truc/glm.git",
 )
