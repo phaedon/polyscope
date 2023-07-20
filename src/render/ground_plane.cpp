@@ -389,7 +389,7 @@ void GroundPlane::buildGui() {
     return "";
   };
 
-  ImGui::SetNextTreeNodeOpen(false, ImGuiCond_FirstUseEver);
+  ImGui::SetNextItemOpen(false, ImGuiCond_FirstUseEver);
   if (ImGui::TreeNode("Ground Plane")) {
 
     ImGui::PushItemWidth(160);

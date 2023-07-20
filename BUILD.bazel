@@ -4,18 +4,24 @@ cc_library(
     name = "polyscope",
     srcs = glob(
         ["src/**/*.cpp"],
+        exclude = ["src/render/opengl/**"],
     ),
     hdrs = glob(
         [
             "include/**/*.h",
             "include/**/*.ipp",
         ],
+        exclude = ["include/polyscope/render/opengl/**"],
     ),
     strip_include_prefix = "include",
     deps = [
         "//deps/json",
+        "//deps/MarchingCubeCpp:marching_cube",
         "@imgui",
         "@stb",
         "@glm",
     ],
+    defines = [
+      #  "POLYSCOPE_BACKEND_OPENGL3_GLFW",
+    ]
 )

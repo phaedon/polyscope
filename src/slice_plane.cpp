@@ -49,9 +49,9 @@ void removeLastSceneSlicePlane() {
 void buildSlicePlaneGUI() {
 
 
-  ImGui::SetNextTreeNodeOpen(false, ImGuiCond_FirstUseEver);
+  ImGui::SetNextItemOpen(false, ImGuiCond_FirstUseEver);
   if (openSlicePlaneMenu) {
-    ImGui::SetNextTreeNodeOpen(true);
+    ImGui::SetNextItemOpen(true);
     openSlicePlaneMenu = false;
   }
   if (ImGui::TreeNode("Slice Planes")) {

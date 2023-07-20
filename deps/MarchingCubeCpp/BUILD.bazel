@@ -1,0 +1,11 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "marching_cube",
+    srcs = ["src/MC_impl.cpp"],
+    hdrs = ["include/MarchingCube/MC.h"],
+    strip_include_prefix = "include",
+    deps = [
+        "@glm",
+    ],
+)
