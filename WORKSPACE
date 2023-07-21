@@ -17,25 +17,39 @@ http_archive(
     name = "imgui-1.86",
     build_file_content = """
 cc_library(
-    name = "imgui-1.86",
+    name = "imgui-glfw",
     srcs = [
         "backends/imgui_impl_glfw.cpp",
         "backends/imgui_impl_opengl3.cpp",
+    ],
+    hdrs = [
+        "backends/imgui_impl_glfw.h",
+        "backends/imgui_impl_opengl3.h",
+        "backends/imgui_impl_opengl3_loader.h",
+        "imgui.h",
+        "imconfig.h",
+    ],
+    includes = ["."],
+)
+
+cc_library(
+    name = "imgui-1.86",
+    srcs = [
         "imgui.cpp",
         "imgui_draw.cpp",
         "imgui_tables.cpp",
         "imgui_widgets.cpp",
     ],
     hdrs = [
-        "backends/imgui_impl_glfw.h",
-        "backends/imgui_impl_opengl3.h",
-        "backends/imgui_impl_opengl3_loader.h",
         "imconfig.h",
         "imgui.h",
         "imgui_internal.h",
         "imstb_rectpack.h",
         "imstb_textedit.h",
         "imstb_truetype.h",
+    ],
+    deps = [
+        ":imgui-glfw",
     ],
     includes = ["."],
     visibility = ["//visibility:public"],
