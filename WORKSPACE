@@ -30,6 +30,7 @@ cc_library(
         "imconfig.h",
     ],
     includes = ["."],
+    include_prefix = "imgui",
 )
 
 cc_library(
