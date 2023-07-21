@@ -13,19 +13,12 @@ cc_library(
     name = "simple_dot_mesh_parser",
     srcs = ["simple_dot_mesh_parser.cpp"],
     hdrs = ["simple_dot_mesh_parser.h"],
-    deps = [
-    ],
 )
 
 cc_binary(
     name = "demo_app",
     srcs = [
         "demo_app.cpp",
-    ],
-    linkopts = [
-        "-lGL",
-        "-lGLU",
-        "-lX11",
     ],
     deps = [
         ":simple_dot_mesh_parser",
@@ -34,6 +27,5 @@ cc_binary(
         "//deps/args/args",
         "@happly",
         "@libglfw3",
-        "@imgui-1.86",
     ],
 )
