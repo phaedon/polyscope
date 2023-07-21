@@ -12,7 +12,7 @@ cc_library(
         ],
     ),
     defines = [
-        "POLYSCOPE_BACKEND_OPENGL3_GLFW",
+        "POLYSCOPE_BACKEND_OPENGL3_GLFW_ENABLED",
     ],
     strip_include_prefix = "include",
     deps = [
