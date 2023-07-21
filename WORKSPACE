@@ -42,3 +42,21 @@ cc_library(
 """,
     remote = "https://github.com/g-truc/glm.git",
 )
+
+# To get this to work on linux, you have to run:
+#     sudo apt install libglfw3-dev
+# TODO: replace with a proper rule using
+#     urls = ["https://github.com/glfw/glfw/archive/refs/tags/3.3.6.tar.gz"],
+new_local_repository(
+    name = "libglfw3",
+    build_file_content =
+        """
+cc_import(
+    name = "libglfw3",
+    hdrs = glob(["include/GLFW/*.h"]),
+    shared_library = "lib/x86_64-linux-gnu/libglfw.so",
+    visibility = ["//visibility:public"],
+)
+""",
+    path = "/usr",
+)

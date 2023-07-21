@@ -1,0 +1,33 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "surface_mesh_io",
+    srcs = ["surface_mesh_io.cpp"],
+    hdrs = ["surface_mesh_io.h"],
+    deps = [
+        "@happly",
+    ],
+)
+
+cc_library(
+    name = "simple_dot_mesh_parser",
+    srcs = ["simple_dot_mesh_parser.cpp"],
+    hdrs = ["simple_dot_mesh_parser.h"],
+    deps = [
+    ],
+)
+
+cc_binary(
+    name = "demo_app",
+    srcs = [
+        "demo_app.cpp",
+    ],
+    deps = [
+        ":simple_dot_mesh_parser",
+        ":surface_mesh_io",
+        "//:polyscope",
+        "//deps/args/args",
+        "@happly",
+        "@libglfw3",
+    ],
+)
