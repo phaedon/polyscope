@@ -6,4 +6,5 @@ cc_library(
     hdrs = [
         "include/glad/glad.h",
     ],
+    strip_include_prefix = "include",
 )

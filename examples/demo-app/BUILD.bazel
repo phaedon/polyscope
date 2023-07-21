@@ -5,6 +5,7 @@ cc_library(
     srcs = ["surface_mesh_io.cpp"],
     hdrs = ["surface_mesh_io.h"],
     deps = [
+        "//:polyscope",
         "@happly",
     ],
 )
