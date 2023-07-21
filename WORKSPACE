@@ -29,21 +29,6 @@ cc_library(
 )
 
 git_repository(
-    name = "stb",
-    branch = "master",
-    build_file_content = """
-cc_library(
-    name = 'stb',
-    srcs = [],
-    includes = ['.'],
-    hdrs = glob(['*.h']),
-    visibility = ['//visibility:public'],
-)
-""",
-    remote = "https://github.com/nothings/stb.git",
-)
-
-git_repository(
     name = "glm",
     branch = "master",
     build_file_content = """
