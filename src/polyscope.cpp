@@ -18,7 +18,7 @@
 #include "json/json.hpp"
 using json = nlohmann::json;
 
-//#include <imgui/backends/imgui_impl_opengl3.h>
+#include <imgui/backends/imgui_impl_opengl3.h>
 
 namespace polyscope {
 
