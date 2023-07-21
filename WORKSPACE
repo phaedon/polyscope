@@ -10,8 +10,40 @@ http_archive(
 git_repository(
     name = "imgui",
     branch = "master",
-    remote = "https://github.com/phaedon/imgui.git"
-,)
+    remote = "https://github.com/phaedon/imgui.git",
+)
+
+http_archive(
+    name = "imgui-1.86",
+    build_file_content = """
+cc_library(
+    name = "imgui-1.86",
+    srcs = [
+        "backends/imgui_impl_glfw.cpp",
+        "backends/imgui_impl_opengl3.cpp",
+        "imgui.cpp",
+        "imgui_draw.cpp",
+        "imgui_tables.cpp",
+        "imgui_widgets.cpp",
+    ],
+    hdrs = [
+        "backends/imgui_impl_glfw.h",
+        "backends/imgui_impl_opengl3.h",
+        "backends/imgui_impl_opengl3_loader.h",
+        "imconfig.h",
+        "imgui.h",
+        "imgui_internal.h",
+        "imstb_rectpack.h",
+        "imstb_textedit.h",
+        "imstb_truetype.h",
+    ],
+    includes = ["."],
+    visibility = ["//visibility:public"],
+)
+""",
+    strip_prefix = "imgui-1.86",
+    urls = ["https://github.com/ocornut/imgui/archive/refs/tags/v1.86.tar.gz"],
+)
 
 git_repository(
     name = "happly",

@@ -1,6 +1,6 @@
 // Copyright 2017-2023, Nicholas Sharp and the Polyscope contributors. https://polyscope.run
 
-#include "backends/imgui_impl_opengl3.h"
+#include <imgui/backends/imgui_impl_opengl3.h>
 #include "polyscope/render/engine.h"
 
 #ifdef POLYSCOPE_BACKEND_OPENGL3_GLFW_ENABLED

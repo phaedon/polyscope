@@ -22,6 +22,11 @@ cc_binary(
     srcs = [
         "demo_app.cpp",
     ],
+    linkopts = [
+        "-lGL",
+        "-lGLU",
+        "-lX11",
+    ],
     deps = [
         ":simple_dot_mesh_parser",
         ":surface_mesh_io",
@@ -29,5 +34,6 @@ cc_binary(
         "//deps/args/args",
         "@happly",
         "@libglfw3",
+        "@imgui-1.86",
     ],
 )

@@ -21,6 +21,6 @@ cc_library(
         "//deps/json",
         "//deps/stb",
         "@glm",
-        "@imgui",
+        "@imgui-1.86",
     ],
 )
