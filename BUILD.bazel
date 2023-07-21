@@ -11,15 +11,16 @@ cc_library(
             "include/**/*.ipp",
         ],
     ),
+    defines = [
+        "POLYSCOPE_BACKEND_OPENGL3_GLFW",
+    ],
     strip_include_prefix = "include",
     deps = [
+        "//deps/MarchingCubeCpp:marching_cube",
+        "//deps/glad",
         "//deps/json",
         "//deps/stb",
-        "//deps/MarchingCubeCpp:marching_cube",
-        "@imgui",
         "@glm",
+        "@imgui",
     ],
-    defines = [
-      #  "POLYSCOPE_BACKEND_OPENGL3_GLFW",
-    ]
 )
