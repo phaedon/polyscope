@@ -18,9 +18,9 @@ cc_library(
     deps = [
         "//deps/MarchingCubeCpp:marching_cube",
         "//deps/glad",
-        "//deps/json",
         "//deps/stb",
         "@glm",
         "@imgui-1.86",
+        "@nlohmann_json//:json",
     ],
 )
