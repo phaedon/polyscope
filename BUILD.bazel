@@ -24,3 +24,28 @@ cc_library(
         "@nlohmann_json//:json",
     ],
 )
+
+cc_library(
+    name = "polyscope_mock",
+    srcs = glob(
+        ["src/**/*.cpp"],
+    ),
+    hdrs = glob(
+        [
+            "include/**/*.h",
+            "include/**/*.ipp",
+        ],
+    ),
+    defines = [
+        "POLYSCOPE_BACKEND_OPENGL_MOCK_ENABLED",
+    ],
+    strip_include_prefix = "include",
+    deps = [
+        "//deps/MarchingCubeCpp:marching_cube",
+        "//deps/glad",
+        "//deps/stb",
+        "@glm",
+        "@imgui-1.86",
+        "@nlohmann_json//:json",
+    ],
+)
