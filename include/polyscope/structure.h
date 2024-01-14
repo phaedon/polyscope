@@ -12,9 +12,15 @@
 #include "polyscope/persistent_value.h"
 #include "polyscope/render/engine.h"
 #include "polyscope/transformation_gizmo.h"
+#include "polyscope/weak_handle.h"
+
+#include "polyscope/render/managed_buffer.h"
 
 
 namespace polyscope {
+
+// forward declarations
+class Group;
 
 
 // A 'structure' in Polyscope terms, is an object with which we can associate data in the UI, such as a point cloud,
@@ -27,7 +33,7 @@ namespace polyscope {
 // user to utilize and access custom structures with little code.
 
 
-class Structure {
+class Structure : public render::ManagedBufferRegistry, public virtual WeakReferrable {
 
 public:
   Structure(std::string name, std::string subtypeName);
@@ -90,6 +96,9 @@ public:
   bool isEnabled();
   void enableIsolate();                      // enable this structure, disable all of same type
   void setEnabledAllOfType(bool newEnabled); // enable/disable all structures of this type
+  void addToGroup(std::string groupName);
+  void addToGroup(Group& group);
+
 
   // Options
   Structure* setTransparency(float newVal); // also enables transparency if <1 and transparency is not enabled
@@ -145,6 +154,8 @@ class ColorImageQuantity;
 class DepthRenderImageQuantity;
 class ColorRenderImageQuantity;
 class ScalarRenderImageQuantity;
+class RawColorRenderImageQuantity;
+class RawColorAlphaRenderImageQuantity;
 
 // Helper used to define quantity types
 template <typename T>
@@ -179,6 +190,7 @@ public:
   QuantityType*
   getQuantity(std::string name); // NOTE: will _not_ return floating quantities, must use other version below
   FloatingQuantity* getFloatingQuantity(std::string name);
+  void checkForQuantityWithNameAndDeleteOrError(std::string name, bool allowReplacement = true);
   void removeQuantity(std::string name, bool errorIfAbsent = false);
   void removeAllQuantities();
 
@@ -220,17 +232,25 @@ public:
                                                         const T2& normalData, const T3& colorData,
                                                         ImageOrigin imageOrigin = ImageOrigin::UpperLeft);
 
-
   template <class T1, class T2, class T3>
   ScalarRenderImageQuantity*
   addScalarRenderImageQuantity(std::string name, size_t dimX, size_t dimY, const T1& depthData, const T2& normalData,
                                const T3& scalarData, ImageOrigin imageOrigin = ImageOrigin::UpperLeft,
                                DataType type = DataType::STANDARD);
 
+  template <class T1, class T2>
+  RawColorRenderImageQuantity* addRawColorRenderImageQuantity(std::string name, size_t dimX, size_t dimY,
+                                                              const T1& depthData, const T2& colorData,
+                                                              ImageOrigin imageOrigin = ImageOrigin::UpperLeft);
+
+  template <class T1, class T2>
+  RawColorAlphaRenderImageQuantity*
+  addRawColorAlphaRenderImageQuantity(std::string name, size_t dimX, size_t dimY, const T1& depthData,
+                                      const T2& colorData, ImageOrigin imageOrigin = ImageOrigin::UpperLeft);
 
   // === Floating Quantity impls
   ScalarImageQuantity* addScalarImageQuantityImpl(std::string name, size_t dimX, size_t dimY,
-                                                  const std::vector<double>& values, ImageOrigin imageOrigin,
+                                                  const std::vector<float>& values, ImageOrigin imageOrigin,
                                                   DataType type);
 
   ColorImageQuantity* addColorImageQuantityImpl(std::string name, size_t dimX, size_t dimY,
@@ -250,12 +270,20 @@ public:
   ScalarRenderImageQuantity* addScalarRenderImageQuantityImpl(std::string name, size_t dimX, size_t dimY,
                                                               const std::vector<float>& depthData,
                                                               const std::vector<glm::vec3>& normalData,
-                                                              const std::vector<double>& scalarData,
+                                                              const std::vector<float>& scalarData,
                                                               ImageOrigin imageOrigin, DataType type);
 
+  RawColorRenderImageQuantity* addRawColorRenderImageQuantityImpl(std::string name, size_t dimX, size_t dimY,
+                                                                  const std::vector<float>& depthData,
+                                                                  const std::vector<glm::vec3>& colorData,
+                                                                  ImageOrigin imageOrigin);
+
+  RawColorAlphaRenderImageQuantity* addRawColorAlphaRenderImageQuantityImpl(std::string name, size_t dimX, size_t dimY,
+                                                                            const std::vector<float>& depthData,
+                                                                            const std::vector<glm::vec4>& colorData,
+                                                                            ImageOrigin imageOrigin);
+
 protected:
-  // helper
-  bool checkForQuantityWithNameAndDeleteOrError(std::string name, bool allowReplacement);
 };
 
 

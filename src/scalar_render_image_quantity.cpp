@@ -13,10 +13,12 @@ namespace polyscope {
 ScalarRenderImageQuantity::ScalarRenderImageQuantity(Structure& parent_, std::string name, size_t dimX, size_t dimY,
                                                      const std::vector<float>& depthData,
                                                      const std::vector<glm::vec3>& normalData,
-                                                     const std::vector<double>& scalarData_, ImageOrigin imageOrigin,
+                                                     const std::vector<float>& scalarData_, ImageOrigin imageOrigin,
                                                      DataType dataType_)
     : RenderImageQuantityBase(parent_, name, dimX, dimY, depthData, normalData, imageOrigin),
-      ScalarQuantity(*this, scalarData_, dataType_) {}
+      ScalarQuantity(*this, scalarData_, dataType_) {
+  values.setTextureSize(dimX, dimY);
+}
 
 void ScalarRenderImageQuantity::draw() {}
 
@@ -35,10 +37,7 @@ void ScalarRenderImageQuantity::drawDelayed() {
   program->setUniform("u_transparency", transparency.get());
 
   setScalarUniforms(*program);
-
-  // make sure we have actual depth testing enabled
-  render::engine->setDepthMode(DepthMode::LEqual);
-  render::engine->setBlendMode(BlendMode::Over);
+  render::engine->setMaterialUniforms(*program, material.get());
 
   // draw
   program->draw();
@@ -66,13 +65,11 @@ void ScalarRenderImageQuantity::buildCustomUI() {
 
 void ScalarRenderImageQuantity::refresh() {
   program = nullptr;
-  textureScalar = nullptr;
   RenderImageQuantityBase::refresh();
 }
 
 
 void ScalarRenderImageQuantity::prepare() {
-  prepareGeometryBuffers();
 
   // push the color data to the buffer
   values.ensureHostBufferPopulated();
@@ -81,19 +78,28 @@ void ScalarRenderImageQuantity::prepare() {
     floatData[i] = static_cast<float>(values.data[i]);
   }
 
-  textureScalar =
-      render::engine->generateTextureBuffer(TextureFormat::R32F, dimX, dimY, static_cast<float*>(&floatData.front()));
-
   // Create the sourceProgram
+  // clang-format off
   program = render::engine->requestShader("TEXTURE_DRAW_RENDERIMAGE_PLAIN",
-                                          addScalarRules({getImageOriginRule(imageOrigin), "LIGHT_MATCAP",
-                                                          "TEXTURE_PROPAGATE_VALUE", "SHADE_COLORMAP_VALUE"}),
-                                          render::ShaderReplacementDefaults::Process);
+    render::engine->addMaterialRules(material.get(),
+      addScalarRules(
+        {
+          getImageOriginRule(imageOrigin), 
+          hasNormals ? "SHADE_NORMAL_FROM_TEXTURE" : "SHADE_NORMAL_FROM_VIEWPOS_VAR",
+          "TEXTURE_PROPAGATE_VALUE", 
+          "SHADE_COLORMAP_VALUE"
+        }
+      )
+    ),
+    render::ShaderReplacementDefaults::Process);
+  // clang-format on
 
   program->setAttribute("a_position", render::engine->screenTrianglesCoords());
-  program->setTextureFromBuffer("t_depth", textureDepth.get());
-  program->setTextureFromBuffer("t_normal", textureNormal.get());
-  program->setTextureFromBuffer("t_scalar", textureScalar.get());
+  program->setTextureFromBuffer("t_depth", depths.getRenderTextureBuffer().get());
+  if (hasNormals) {
+    program->setTextureFromBuffer("t_normal", normals.getRenderTextureBuffer().get());
+  }
+  program->setTextureFromBuffer("t_scalar", values.getRenderTextureBuffer().get());
   render::engine->setMaterial(*program, material.get());
   program->setTextureFromColormap("t_colormap", cMap.get());
 }
@@ -101,19 +107,13 @@ void ScalarRenderImageQuantity::prepare() {
 
 std::string ScalarRenderImageQuantity::niceName() { return name + " (scalar render image)"; }
 
-ScalarRenderImageQuantity* ScalarRenderImageQuantity::setEnabled(bool newEnabled) {
-  enabled = newEnabled;
-  requestRedraw();
-  return this;
-}
-
 
 // Instantiate a construction helper which is used to avoid header dependencies. See forward declaration and note in
 // structure.ipp.
 ScalarRenderImageQuantity* createScalarRenderImage(Structure& parent, std::string name, size_t dimX, size_t dimY,
                                                    const std::vector<float>& depthData,
                                                    const std::vector<glm::vec3>& normalData,
-                                                   const std::vector<double>& scalarData, ImageOrigin imageOrigin,
+                                                   const std::vector<float>& scalarData, ImageOrigin imageOrigin,
                                                    DataType dataType) {
 
   return new ScalarRenderImageQuantity(parent, name, dimX, dimY, depthData, normalData, scalarData, imageOrigin,

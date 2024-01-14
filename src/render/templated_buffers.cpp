@@ -3,10 +3,15 @@
 
 #include <vector>
 
+#include "polyscope/render/engine.h"
 #include "polyscope/render/templated_buffers.h"
 
 namespace polyscope {
 namespace render {
+
+// ==========================================================
+// === Attribute buffers
+// ==========================================================
 
 // == Generate Buffer
 
@@ -51,7 +56,7 @@ std::shared_ptr<AttributeBuffer> generateAttributeBuffer<glm::vec4>(Engine* engi
 }
 
 template <>
-std::shared_ptr<AttributeBuffer> generateAttributeBuffer<size_t>(Engine* engine) {
+std::shared_ptr<AttributeBuffer> generateAttributeBuffer<uint64_t>(Engine* engine) {
   return engine->generateAttributeBuffer(RenderDataType::UInt);
 }
 
@@ -132,7 +137,7 @@ glm::vec4 getAttributeBufferData<glm::vec4>(AttributeBuffer& buff, size_t ind) {
 }
 
 template <>
-size_t getAttributeBufferData<size_t>(AttributeBuffer& buff, size_t ind) {
+uint64_t getAttributeBufferData<uint64_t>(AttributeBuffer& buff, size_t ind) {
   return buff.getData_uint32(ind);
 }
 
@@ -228,13 +233,13 @@ std::vector<glm::vec4> getAttributeBufferDataRange<glm::vec4>(AttributeBuffer& b
 }
 
 template <>
-std::vector<size_t> getAttributeBufferDataRange<size_t>(AttributeBuffer& buff, size_t ind, size_t count) {
+std::vector<uint64_t> getAttributeBufferDataRange<uint64_t>(AttributeBuffer& buff, size_t ind, size_t count) {
   std::vector<uint32_t> uint32Vals = buff.getDataRange_uint32(ind, count);
-  std::vector<size_t> sizetVals(count);
+  std::vector<uint64_t> uint64Vals(count);
   for (size_t i = 0; i < count; i++) {
-    sizetVals[i] = static_cast<size_t>(uint32Vals[i]);
+    uint64Vals[i] = static_cast<uint64_t>(uint32Vals[i]);
   }
-  return sizetVals;
+  return uint64Vals;
 }
 
 template <>
@@ -261,6 +266,115 @@ template <>
 std::vector<glm::uvec4> getAttributeBufferDataRange<glm::uvec4>(AttributeBuffer& buff, size_t ind, size_t count) {
   return buff.getDataRange_uvec4(ind, count);
 }
+
+// ==========================================================
+// === Texture buffers
+// ==========================================================
+
+// == Generate Buffer
+
+template <>
+std::shared_ptr<TextureBuffer> generateTextureBuffer<float, DeviceBufferType::Texture1d>(Engine* engine) {
+  return engine->generateTextureBuffer(TextureFormat::R32F, 0, (float*)nullptr);
+}
+
+template <>
+std::shared_ptr<TextureBuffer> generateTextureBuffer<float, DeviceBufferType::Texture2d>(Engine* engine) {
+  return engine->generateTextureBuffer(TextureFormat::R32F, 0, 0, (float*)nullptr);
+}
+
+template <>
+std::shared_ptr<TextureBuffer> generateTextureBuffer<float, DeviceBufferType::Texture3d>(Engine* engine) {
+  return engine->generateTextureBuffer(TextureFormat::R32F, 0, 0, 0, (float*)nullptr);
+}
+
+template <>
+std::shared_ptr<TextureBuffer> generateTextureBuffer<double, DeviceBufferType::Texture1d>(Engine* engine) {
+  return engine->generateTextureBuffer(TextureFormat::R32F, 0, (float*)nullptr);
+}
+
+template <>
+std::shared_ptr<TextureBuffer> generateTextureBuffer<double, DeviceBufferType::Texture2d>(Engine* engine) {
+  return engine->generateTextureBuffer(TextureFormat::R32F, 0, 0, (float*)nullptr);
+}
+
+template <>
+std::shared_ptr<TextureBuffer> generateTextureBuffer<double, DeviceBufferType::Texture3d>(Engine* engine) {
+  return engine->generateTextureBuffer(TextureFormat::R32F, 0, 0, 0, (float*)nullptr);
+}
+
+template <>
+std::shared_ptr<TextureBuffer> generateTextureBuffer<glm::vec3, DeviceBufferType::Texture1d>(Engine* engine) {
+  return engine->generateTextureBuffer(TextureFormat::RGB32F, 0, (float*)nullptr);
+}
+
+template <>
+std::shared_ptr<TextureBuffer> generateTextureBuffer<glm::vec3, DeviceBufferType::Texture2d>(Engine* engine) {
+  return engine->generateTextureBuffer(TextureFormat::RGB32F, 0, 0, (float*)nullptr);
+}
+
+template <>
+std::shared_ptr<TextureBuffer> generateTextureBuffer<glm::vec3, DeviceBufferType::Texture3d>(Engine* engine) {
+  return engine->generateTextureBuffer(TextureFormat::RGB32F, 0, 0, 0, (float*)nullptr);
+}
+
+template <>
+std::shared_ptr<TextureBuffer> generateTextureBuffer<glm::vec4, DeviceBufferType::Texture1d>(Engine* engine) {
+  return engine->generateTextureBuffer(TextureFormat::RGBA32F, 0, (float*)nullptr);
+}
+
+template <>
+std::shared_ptr<TextureBuffer> generateTextureBuffer<glm::vec4, DeviceBufferType::Texture2d>(Engine* engine) {
+  return engine->generateTextureBuffer(TextureFormat::RGBA32F, 0, 0, (float*)nullptr);
+}
+
+template <>
+std::shared_ptr<TextureBuffer> generateTextureBuffer<glm::vec4, DeviceBufferType::Texture3d>(Engine* engine) {
+  return engine->generateTextureBuffer(TextureFormat::RGBA32F, 0, 0, 0, (float*)nullptr);
+}
+
+// general version which dispatches on D
+
+template <typename T>
+std::shared_ptr<TextureBuffer> generateTextureBuffer(DeviceBufferType D, Engine* engine) {
+  switch (D) {
+  case DeviceBufferType::Attribute:
+    exception("bad call");
+    break;
+  case DeviceBufferType::Texture1d:
+    return generateTextureBuffer<T, DeviceBufferType::Texture1d>(engine);
+    break;
+  case DeviceBufferType::Texture2d:
+    return generateTextureBuffer<T, DeviceBufferType::Texture2d>(engine);
+    break;
+  case DeviceBufferType::Texture3d:
+    return generateTextureBuffer<T, DeviceBufferType::Texture3d>(engine);
+    break;
+  }
+  return nullptr;
+}
+
+// instantiations for the above function
+// clang-format off
+template std::shared_ptr<TextureBuffer> generateTextureBuffer<float     >(DeviceBufferType D, Engine* engine);
+template std::shared_ptr<TextureBuffer> generateTextureBuffer<double    >(DeviceBufferType D, Engine* engine);
+template std::shared_ptr<TextureBuffer> generateTextureBuffer<int32_t   >(DeviceBufferType D, Engine* engine);
+template std::shared_ptr<TextureBuffer> generateTextureBuffer<uint32_t  >(DeviceBufferType D, Engine* engine);
+
+template std::shared_ptr<TextureBuffer> generateTextureBuffer<glm::vec2>(DeviceBufferType D, Engine* engine);
+template std::shared_ptr<TextureBuffer> generateTextureBuffer<glm::vec3>(DeviceBufferType D, Engine* engine);
+template std::shared_ptr<TextureBuffer> generateTextureBuffer<glm::vec4>(DeviceBufferType D, Engine* engine);
+
+template std::shared_ptr<TextureBuffer> generateTextureBuffer<glm::uvec2>(DeviceBufferType D, Engine* engine);
+template std::shared_ptr<TextureBuffer> generateTextureBuffer<glm::uvec3>(DeviceBufferType D, Engine* engine);
+template std::shared_ptr<TextureBuffer> generateTextureBuffer<glm::uvec4>(DeviceBufferType D, Engine* engine);
+
+template std::shared_ptr<TextureBuffer> generateTextureBuffer<std::array<glm::vec3, 2>>(DeviceBufferType D, Engine* engine);
+template std::shared_ptr<TextureBuffer> generateTextureBuffer<std::array<glm::vec3, 3>>(DeviceBufferType D, Engine* engine);
+template std::shared_ptr<TextureBuffer> generateTextureBuffer<std::array<glm::vec3, 4>>(DeviceBufferType D, Engine* engine);
+
+// clang-format on
+
 
 } // namespace render
 } // namespace polyscope

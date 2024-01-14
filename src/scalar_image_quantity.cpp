@@ -11,8 +11,10 @@ namespace polyscope {
 
 
 ScalarImageQuantity::ScalarImageQuantity(Structure& parent_, std::string name, size_t dimX, size_t dimY,
-                                         const std::vector<double>& data_, ImageOrigin imageOrigin_, DataType dataType_)
-    : ImageQuantity(parent_, name, dimX, dimY, imageOrigin_), ScalarQuantity(*this, data_, dataType_) {}
+                                         const std::vector<float>& data_, ImageOrigin imageOrigin_, DataType dataType_)
+    : ImageQuantity(parent_, name, dimX, dimY, imageOrigin_), ScalarQuantity(*this, data_, dataType_) {
+  values.setTextureSize(dimX, dimY);
+}
 
 
 void ScalarImageQuantity::buildCustomUI() {
@@ -34,20 +36,6 @@ void ScalarImageQuantity::buildCustomUI() {
   buildImageUI();
 }
 
-void ScalarImageQuantity::ensureRawTexturePopulated() {
-  if (textureRaw) return; // already populated, nothing to do
-
-  // Must be rendering from a buffer of data, copy it over (common case)
-
-  values.ensureHostBufferPopulated();
-  const std::vector<double>& srcData = values.data;
-  std::vector<float> srcDataFloat(srcData.size());
-  for (size_t i = 0; i < srcData.size(); i++) {
-    srcDataFloat[i] = static_cast<float>(srcData[i]);
-  }
-  textureRaw = render::engine->generateTextureBuffer(TextureFormat::R32F, dimX, dimY, &(srcDataFloat.front()));
-}
-
 void ScalarImageQuantity::prepareIntermediateRender() {
   // Texture and sourceProgram for rendering in
   framebufferIntermediate = render::engine->generateFrameBuffer(dimX, dimY);
@@ -58,29 +46,26 @@ void ScalarImageQuantity::prepareIntermediateRender() {
 
 void ScalarImageQuantity::prepareFullscreen() {
 
-  ensureRawTexturePopulated();
-
   // Create the sourceProgram
   fullscreenProgram = render::engine->requestShader(
-      "SCALAR_TEXTURE_COLORMAP", this->addScalarRules({getImageOriginRule(imageOrigin), "TEXTURE_SET_TRANSPARENCY"}),
+      "SCALAR_TEXTURE_COLORMAP",
+      this->addScalarRules({getImageOriginRule(imageOrigin), "TEXTURE_SET_TRANSPARENCY", "TEXTURE_PREMULTIPLY_OUT"}),
       render::ShaderReplacementDefaults::Process);
   fullscreenProgram->setAttribute("a_position", render::engine->screenTrianglesCoords());
-  fullscreenProgram->setTextureFromBuffer("t_scalar", textureRaw.get());
+  fullscreenProgram->setTextureFromBuffer("t_scalar", values.getRenderTextureBuffer().get());
   fullscreenProgram->setTextureFromColormap("t_colormap", this->cMap.get());
 }
 
 void ScalarImageQuantity::prepareBillboard() {
 
-  ensureRawTexturePopulated();
-
   // Create the sourceProgram
-  billboardProgram =
-      render::engine->requestShader("SCALAR_TEXTURE_COLORMAP",
-                                    this->addScalarRules({getImageOriginRule(imageOrigin), "TEXTURE_SET_TRANSPARENCY",
-                                                          "TEXTURE_BILLBOARD_FROM_UNIFORMS"}),
-                                    render::ShaderReplacementDefaults::Process);
+  billboardProgram = render::engine->requestShader(
+      "SCALAR_TEXTURE_COLORMAP",
+      this->addScalarRules({getImageOriginRule(imageOrigin), "TEXTURE_SET_TRANSPARENCY", "TEXTURE_PREMULTIPLY_OUT",
+                            "TEXTURE_BILLBOARD_FROM_UNIFORMS"}),
+      render::ShaderReplacementDefaults::Process);
   billboardProgram->setAttribute("a_position", render::engine->screenTrianglesCoords());
-  billboardProgram->setTextureFromBuffer("t_scalar", textureRaw.get());
+  billboardProgram->setTextureFromBuffer("t_scalar", values.getRenderTextureBuffer().get());
   billboardProgram->setTextureFromColormap("t_colormap", this->cMap.get());
 }
 
@@ -102,7 +87,6 @@ void ScalarImageQuantity::showFullscreen() {
 void ScalarImageQuantity::renderIntermediate() {
   if (!fullscreenProgram) prepareFullscreen();
   if (!textureIntermediateRendered) prepareIntermediateRender();
-  ensureRawTexturePopulated();
 
   // Set uniforms
   this->setScalarUniforms(*fullscreenProgram);
@@ -116,7 +100,10 @@ void ScalarImageQuantity::renderIntermediate() {
 }
 
 void ScalarImageQuantity::showInImGuiWindow() {
-  if (!textureIntermediateRendered) return;
+  // it's important to do this here, so the image is available this frame
+  // if we did it in draw(), then it wouldn't be available until next frame, which
+  // causes problems if we are updating every frame
+  renderIntermediate();
 
   ImGui::Begin(name.c_str(), nullptr, ImGuiWindowFlags_NoScrollbar);
 
@@ -178,7 +165,7 @@ ScalarImageQuantity* ScalarImageQuantity::setEnabled(bool newEnabled) {
 // Instantiate a construction helper which is used to avoid header dependencies. See forward declaration and note in
 // structure.ipp.
 ScalarImageQuantity* createScalarImageQuantity(Structure& parent, std::string name, size_t dimX, size_t dimY,
-                                               const std::vector<double>& data, ImageOrigin imageOrigin,
+                                               const std::vector<float>& data, ImageOrigin imageOrigin,
                                                DataType dataType) {
   return new ScalarImageQuantity(parent, name, dimX, dimY, data, imageOrigin, dataType);
 }

@@ -14,7 +14,7 @@ namespace polyscope {
 class ScalarImageQuantity : public ImageQuantity, public ScalarQuantity<ScalarImageQuantity> {
 
 public:
-  ScalarImageQuantity(Structure& parent_, std::string name, size_t dimX, size_t dimY, const std::vector<double>& data,
+  ScalarImageQuantity(Structure& parent_, std::string name, size_t dimX, size_t dimY, const std::vector<float>& data,
                       ImageOrigin imageOrigin, DataType dataType);
 
   virtual void buildCustomUI() override;
@@ -29,14 +29,13 @@ public:
 
 protected:
   // rendering internals
-  std::shared_ptr<render::TextureBuffer> textureRaw, textureIntermediateRendered;
+  std::shared_ptr<render::TextureBuffer> textureIntermediateRendered;
   std::shared_ptr<render::ShaderProgram> fullscreenProgram, billboardProgram;
   std::shared_ptr<render::FrameBuffer> framebufferIntermediate;
 
   void prepareFullscreen();
   void prepareIntermediateRender();
   void prepareBillboard();
-  void ensureRawTexturePopulated();
 
   virtual void showFullscreen() override;
   virtual void showInImGuiWindow() override;

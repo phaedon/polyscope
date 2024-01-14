@@ -11,7 +11,7 @@
 namespace polyscope {
 
 SurfaceScalarQuantity::SurfaceScalarQuantity(std::string name, SurfaceMesh& mesh_, std::string definedOn_,
-                                             const std::vector<double>& values_, DataType dataType_)
+                                             const std::vector<float>& values_, DataType dataType_)
     : SurfaceMeshQuantity(name, mesh_, true), ScalarQuantity(*this, values_, dataType_), definedOn(definedOn_) {}
 
 void SurfaceScalarQuantity::draw() {
@@ -25,6 +25,7 @@ void SurfaceScalarQuantity::draw() {
   parent.setStructureUniforms(*program);
   parent.setSurfaceMeshUniforms(*program);
   setScalarUniforms(*program);
+  render::engine->setMaterialUniforms(*program, parent.getMaterial());
 
   program->draw();
 }
@@ -58,19 +59,29 @@ std::string SurfaceScalarQuantity::niceName() { return name + " (" + definedOn +
 // ==========           Vertex Scalar            ==========
 // ========================================================
 
-SurfaceVertexScalarQuantity::SurfaceVertexScalarQuantity(std::string name, const std::vector<double>& values_,
+SurfaceVertexScalarQuantity::SurfaceVertexScalarQuantity(std::string name, const std::vector<float>& values_,
                                                          SurfaceMesh& mesh_, DataType dataType_)
     : SurfaceScalarQuantity(name, mesh_, "vertex", values_, dataType_)
 
 {
   values.ensureHostBufferPopulated();
-  parent.vertexAreas.ensureHostBufferPopulated();
-  hist.buildHistogram(values.data); // rebuild to incorporate weights
+  hist.buildHistogram(values.data);
 }
 
 void SurfaceVertexScalarQuantity::createProgram() {
   // Create the program to draw this quantity
-  program = render::engine->requestShader("MESH", parent.addSurfaceMeshRules(addScalarRules({"MESH_PROPAGATE_VALUE"})));
+
+  // clang-format off
+  program = render::engine->requestShader("MESH",
+      render::engine->addMaterialRules(parent.getMaterial(),
+        parent.addSurfaceMeshRules(
+          addScalarRules(
+            {"MESH_PROPAGATE_VALUE"}
+          )
+        )
+      )
+    );
+  // clang-format on
 
   program->setAttribute("a_value", values.getIndexedRenderAttributeBuffer(parent.triangleVertexInds));
   parent.setMeshGeometryAttributes(*program);
@@ -90,19 +101,30 @@ void SurfaceVertexScalarQuantity::buildVertexInfoGUI(size_t vInd) {
 // ==========            Face Scalar             ==========
 // ========================================================
 
-SurfaceFaceScalarQuantity::SurfaceFaceScalarQuantity(std::string name, const std::vector<double>& values_,
+SurfaceFaceScalarQuantity::SurfaceFaceScalarQuantity(std::string name, const std::vector<float>& values_,
                                                      SurfaceMesh& mesh_, DataType dataType_)
     : SurfaceScalarQuantity(name, mesh_, "face", values_, dataType_)
 
 {
   values.ensureHostBufferPopulated();
   parent.faceAreas.ensureHostBufferPopulated();
-  hist.buildHistogram(values.data); // rebuild to incorporate weights
+  hist.buildHistogram(values.data);
 }
 
 void SurfaceFaceScalarQuantity::createProgram() {
   // Create the program to draw this quantity
-  program = render::engine->requestShader("MESH", parent.addSurfaceMeshRules(addScalarRules({"MESH_PROPAGATE_VALUE"})));
+
+  // clang-format off
+  program = render::engine->requestShader("MESH",
+      render::engine->addMaterialRules(parent.getMaterial(),
+        parent.addSurfaceMeshRules(
+          addScalarRules(
+            {"MESH_PROPAGATE_VALUE"}
+          )
+        )
+      )
+    );
+  // clang-format on
 
   program->setAttribute("a_value", values.getIndexedRenderAttributeBuffer(parent.triangleFaceInds));
   parent.setMeshGeometryAttributes(*program);
@@ -125,19 +147,29 @@ void SurfaceFaceScalarQuantity::buildFaceInfoGUI(size_t fInd) {
 
 // TODO need to do something about values for internal edges in triangulated polygons
 
-SurfaceEdgeScalarQuantity::SurfaceEdgeScalarQuantity(std::string name, const std::vector<double>& values_,
+SurfaceEdgeScalarQuantity::SurfaceEdgeScalarQuantity(std::string name, const std::vector<float>& values_,
                                                      SurfaceMesh& mesh_, DataType dataType_)
     : SurfaceScalarQuantity(name, mesh_, "edge", values_, dataType_)
 
 {
   values.ensureHostBufferPopulated();
-  hist.buildHistogram(values.data); // rebuild to incorporate weights
+  hist.buildHistogram(values.data);
 }
 
 void SurfaceEdgeScalarQuantity::createProgram() {
   // Create the program to draw this quantity
-  program = render::engine->requestShader(
-      "MESH", parent.addSurfaceMeshRules(addScalarRules({"MESH_PROPAGATE_HALFEDGE_VALUE"})));
+
+  // clang-format off
+  program = render::engine->requestShader("MESH",
+      render::engine->addMaterialRules(parent.getMaterial(),
+        parent.addSurfaceMeshRules(
+          addScalarRules(
+            {"MESH_PROPAGATE_HALFEDGE_VALUE"}
+          )
+        )
+      )
+    );
+  // clang-format on
 
   program->setAttribute("a_value3", values.getIndexedRenderAttributeBuffer(parent.triangleAllEdgeInds));
   parent.setMeshGeometryAttributes(*program);
@@ -157,7 +189,7 @@ void SurfaceEdgeScalarQuantity::buildEdgeInfoGUI(size_t eInd) {
 // ==========          Halfedge Scalar           ==========
 // ========================================================
 
-SurfaceHalfedgeScalarQuantity::SurfaceHalfedgeScalarQuantity(std::string name, const std::vector<double>& values_,
+SurfaceHalfedgeScalarQuantity::SurfaceHalfedgeScalarQuantity(std::string name, const std::vector<float>& values_,
                                                              SurfaceMesh& mesh_, DataType dataType_)
     : SurfaceScalarQuantity(name, mesh_, "halfedge", values_, dataType_)
 
@@ -168,8 +200,18 @@ SurfaceHalfedgeScalarQuantity::SurfaceHalfedgeScalarQuantity(std::string name, c
 
 void SurfaceHalfedgeScalarQuantity::createProgram() {
   // Create the program to draw this quantity
-  program = render::engine->requestShader(
-      "MESH", parent.addSurfaceMeshRules(addScalarRules({"MESH_PROPAGATE_HALFEDGE_VALUE"})));
+
+  // clang-format off
+  program = render::engine->requestShader("MESH",
+      render::engine->addMaterialRules(parent.getMaterial(),
+        parent.addSurfaceMeshRules(
+          addScalarRules(
+            {"MESH_PROPAGATE_HALFEDGE_VALUE"}
+          )
+        )
+      )
+    );
+  // clang-format on
 
   program->setAttribute("a_value3", values.getIndexedRenderAttributeBuffer(parent.triangleAllHalfedgeInds));
   parent.setMeshGeometryAttributes(*program);
@@ -188,7 +230,7 @@ void SurfaceHalfedgeScalarQuantity::buildHalfedgeInfoGUI(size_t heInd) {
 // ==========          Corner Scalar           ==========
 // ========================================================
 
-SurfaceCornerScalarQuantity::SurfaceCornerScalarQuantity(std::string name, const std::vector<double>& values_,
+SurfaceCornerScalarQuantity::SurfaceCornerScalarQuantity(std::string name, const std::vector<float>& values_,
                                                          SurfaceMesh& mesh_, DataType dataType_)
     : SurfaceScalarQuantity(name, mesh_, "corner", values_, dataType_)
 
@@ -199,7 +241,18 @@ SurfaceCornerScalarQuantity::SurfaceCornerScalarQuantity(std::string name, const
 
 void SurfaceCornerScalarQuantity::createProgram() {
   // Create the program to draw this quantity
-  program = render::engine->requestShader("MESH", parent.addSurfaceMeshRules(addScalarRules({"MESH_PROPAGATE_VALUE"})));
+
+  // clang-format off
+  program = render::engine->requestShader("MESH",
+      render::engine->addMaterialRules(parent.getMaterial(),
+        parent.addSurfaceMeshRules(
+          addScalarRules(
+            {"MESH_PROPAGATE_VALUE"}
+          )
+        )
+      )
+    );
+  // clang-format on
 
   program->setAttribute("a_value", values.getIndexedRenderAttributeBuffer(parent.triangleCornerInds));
   parent.setMeshGeometryAttributes(*program);
@@ -213,5 +266,45 @@ void SurfaceCornerScalarQuantity::buildCornerInfoGUI(size_t cInd) {
   ImGui::Text("%g", values.getValue(cInd));
   ImGui::NextColumn();
 }
+
+// ========================================================
+// ==========          Texture Scalar            ==========
+// ========================================================
+
+SurfaceTextureScalarQuantity::SurfaceTextureScalarQuantity(std::string name, SurfaceMesh& mesh_,
+                                                           SurfaceParameterizationQuantity& param_, size_t dimX_,
+                                                           size_t dimY_, const std::vector<float>& values_,
+                                                           ImageOrigin origin_, DataType dataType_)
+    : SurfaceScalarQuantity(name, mesh_, "vertex", values_, dataType_), param(param_), dimX(dimX_), dimY(dimY_),
+      imageOrigin(origin_) {
+  values.setTextureSize(dimX, dimY);
+  values.ensureHostBufferPopulated();
+  hist.buildHistogram(values.data);
+}
+
+void SurfaceTextureScalarQuantity::createProgram() {
+  // Create the program to draw this quantity
+
+  // clang-format off
+  program = render::engine->requestShader("MESH",
+      render::engine->addMaterialRules(parent.getMaterial(),
+        parent.addSurfaceMeshRules(
+          addScalarRules(
+            {"MESH_PROPAGATE_TCOORD", getImageOriginRule(imageOrigin), "TEXTURE_PROPAGATE_VALUE"}
+          )
+        )
+      )
+    );
+  // clang-format on
+
+  parent.setMeshGeometryAttributes(*program);
+  program->setAttribute("a_tCoord", param.coords.getIndexedRenderAttributeBuffer(parent.triangleCornerInds));
+  program->setTextureFromBuffer("t_scalar", values.getRenderTextureBuffer().get());
+  render::engine->setMaterial(*program, parent.getMaterial());
+  program->setTextureFromColormap("t_colormap", cMap.get());
+
+  values.getRenderTextureBuffer()->setFilterMode(FilterMode::Linear);
+}
+
 
 } // namespace polyscope

@@ -22,6 +22,7 @@ if("${POLYSCOPE_BACKEND_OPENGL3_GLFW}")
     render/opengl/gl_engine.cpp  
     render/opengl/shaders/texture_draw_shaders.cpp  
     render/opengl/shaders/lighting_shaders.cpp  
+    render/opengl/shaders/grid_shaders.cpp  
     render/opengl/shaders/ground_plane_shaders.cpp  
     render/opengl/shaders/gizmo_shaders.cpp  
     render/opengl/shaders/histogram_shaders.cpp  
@@ -80,6 +81,7 @@ if("${POLYSCOPE_BACKEND_OPENGL_MOCK}")
     render/mock_opengl/mock_gl_engine.cpp  
     render/opengl/shaders/texture_draw_shaders.cpp  
     render/opengl/shaders/lighting_shaders.cpp  
+    render/opengl/shaders/grid_shaders.cpp  
     render/opengl/shaders/ground_plane_shaders.cpp  
     render/opengl/shaders/gizmo_shaders.cpp  
     render/opengl/shaders/histogram_shaders.cpp  
@@ -145,6 +147,8 @@ SET(SRCS
   color_management.cpp
   transformation_gizmo.cpp
   slice_plane.cpp
+  weak_handle.cpp
+  marching_cubes.cpp
 
   ## Structures
 
@@ -176,12 +180,13 @@ SET(SRCS
   
   # Volume grid
   volume_grid.cpp
-  #volume_mesh_color_quantity.cpp
   volume_grid_scalar_quantity.cpp
-  volume_grid_vector_quantity.cpp
   
   # Camera view
   camera_view.cpp
+  
+  # Simple triangle mesh
+  simple_triangle_mesh.cpp
  
   # Floating quantities
   floating_quantity_structure.cpp
@@ -193,6 +198,8 @@ SET(SRCS
   depth_render_image_quantity.cpp
   color_render_image_quantity.cpp
   scalar_render_image_quantity.cpp
+  raw_color_render_image_quantity.cpp
+  raw_color_alpha_render_image_quantity.cpp
   
   # Rendering utilities
   imgui_config.cpp
@@ -244,8 +251,8 @@ SET(HEADERS
   ${INCLUDE_ROOT}/histogram.h
   ${INCLUDE_ROOT}/image_quantity.h
   ${INCLUDE_ROOT}/imgui_config.h
-  ${INCLUDE_ROOT}/implicit_surface.h
-  ${INCLUDE_ROOT}/implicit_surface.ipp
+  ${INCLUDE_ROOT}/implicit_helpers.h
+  ${INCLUDE_ROOT}/implicit_helpers.ipp
   ${INCLUDE_ROOT}/messages.h
   ${INCLUDE_ROOT}/options.h
   ${INCLUDE_ROOT}/parameterization_quantity.h
@@ -263,10 +270,13 @@ SET(HEADERS
   ${INCLUDE_ROOT}/polyscope.h
   ${INCLUDE_ROOT}/quantity.h
   ${INCLUDE_ROOT}/quantity.ipp
+  ${INCLUDE_ROOT}/raw_color_render_image_quantity.h
   ${INCLUDE_ROOT}/render/color_maps.h
   ${INCLUDE_ROOT}/render/engine.h
   ${INCLUDE_ROOT}/render/engine.ipp
   ${INCLUDE_ROOT}/render/ground_plane.h
+  ${INCLUDE_ROOT}/render/managed_buffer.h
+  ${INCLUDE_ROOT}/render/managed_buffer.ipp
   ${INCLUDE_ROOT}/render/material_defs.h
   ${INCLUDE_ROOT}/render/materials.h
   ${INCLUDE_ROOT}/render_image_quantity_base.h
@@ -274,6 +284,8 @@ SET(HEADERS
   ${INCLUDE_ROOT}/scalar_quantity.h
   ${INCLUDE_ROOT}/scalar_quantity.ipp
   ${INCLUDE_ROOT}/screenshot.h
+  ${INCLUDE_ROOT}/simple_triangle_mesh.h
+  ${INCLUDE_ROOT}/simple_triangle_mesh.ipp
   ${INCLUDE_ROOT}/slice_plane.h
   ${INCLUDE_ROOT}/standardize_data_array.h
   ${INCLUDE_ROOT}/structure.h
@@ -300,8 +312,7 @@ SET(HEADERS
   ${INCLUDE_ROOT}/volume_grid.ipp
   ${INCLUDE_ROOT}/volume_grid_quantity.h
   ${INCLUDE_ROOT}/volume_grid_scalar_quantity.h
-  #${INCLUDE_ROOT}/volume_grid_color_quantity.h
-  ${INCLUDE_ROOT}/volume_grid_vector_quantity.h
+  ${INCLUDE_ROOT}/weak_handle.h
 )
 
 # Create a single library for the project
@@ -322,6 +333,7 @@ target_include_directories(polyscope PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../incl
 target_include_directories(polyscope PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../deps/glm")
 #target_include_directories(polyscope PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../deps/args") # not used, polyscope generates no apps directly
 target_include_directories(polyscope PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../deps/happly")
+target_include_directories(polyscope PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../deps/MarchingCubeCpp")
 target_include_directories(polyscope PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../deps/json/include")
 target_include_directories(polyscope PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../deps/stb")
 target_include_directories(polyscope PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../deps/MarchingCubeCpp/include")
@@ -329,4 +341,4 @@ target_include_directories(polyscope PRIVATE "${BACKEND_INCLUDE_DIRS}")
         
 # Link settings
 target_link_libraries(polyscope PUBLIC imgui)
-target_link_libraries(polyscope PRIVATE "${BACKEND_LIBS}" stb MarchingCube)
+target_link_libraries(polyscope PRIVATE "${BACKEND_LIBS}" stb)

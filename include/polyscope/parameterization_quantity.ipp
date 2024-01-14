@@ -14,6 +14,9 @@ std::string styleName(ParamVizStyle v) {
   case ParamVizStyle::CHECKER:
     return "checker";
     break;
+  case ParamVizStyle::CHECKER_ISLANDS:
+    return "checker islands";
+    break;
   case ParamVizStyle::GRID:
     return "grid";
     break;
@@ -34,8 +37,15 @@ template <typename QuantityT>
 ParameterizationQuantity<QuantityT>::ParameterizationQuantity(QuantityT& quantity_,
                                                               const std::vector<glm::vec2>& coords_,
                                                               ParamCoordsType type_, ParamVizStyle style_)
-    : quantity(quantity_), coords(quantity.uniquePrefix() + "#coords", coordsData), coordsType(type_),
-      coordsData(coords_), checkerSize(quantity.uniquePrefix() + "#checkerSize", 0.02),
+    : quantity(quantity_),
+
+      // buffers
+      coords(&quantity, quantity.uniquePrefix() + "#coords", coordsData),
+      islandLabels(&quantity, quantity.uniquePrefix() + "#islandLabels", islandLabelsData), coordsType(type_),
+      coordsData(coords_),
+
+      // options
+      checkerSize(quantity.uniquePrefix() + "#checkerSize", 0.02),
       vizStyle(quantity.uniquePrefix() + "#vizStyle", style_),
       checkColor1(quantity.uniquePrefix() + "#checkColor1", render::RGB_PINK),
       checkColor2(quantity.uniquePrefix() + "#checkColor2", glm::vec3(.976, .856, .885)),
@@ -52,20 +62,6 @@ void ParameterizationQuantity<QuantityT>::buildParameterizationUI() {
 
   ImGui::PushItemWidth(100);
 
-  ImGui::SameLine(); // put it next to enabled
-
-  // Choose viz style
-  if (ImGui::BeginCombo("style", styleName(getStyle()).c_str())) {
-    for (ParamVizStyle s :
-         {ParamVizStyle::CHECKER, ParamVizStyle::GRID, ParamVizStyle::LOCAL_CHECK, ParamVizStyle::LOCAL_RAD}) {
-      if (ImGui::Selectable(styleName(s).c_str(), s == getStyle())) {
-        setStyle(s);
-      }
-    }
-    ImGui::EndCombo();
-  }
-
-
   // Modulo stripey width
   if (ImGui::DragFloat("period", &checkerSize.get(), .001, 0.0001, 1.0, "%.4f",
                        ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat)) {
@@ -77,17 +73,30 @@ void ParameterizationQuantity<QuantityT>::buildParameterizationUI() {
 
   switch (getStyle()) {
   case ParamVizStyle::CHECKER:
+    ImGui::SameLine();
     if (ImGui::ColorEdit3("##colors2", &checkColor1.get()[0], ImGuiColorEditFlags_NoInputs))
       setCheckerColors(getCheckerColors());
     ImGui::SameLine();
-    if (ImGui::ColorEdit3("colors", &checkColor2.get()[0], ImGuiColorEditFlags_NoInputs))
+    if (ImGui::ColorEdit3("##colors", &checkColor2.get()[0], ImGuiColorEditFlags_NoInputs))
       setCheckerColors(getCheckerColors());
     break;
+  case ParamVizStyle::CHECKER_ISLANDS:
+    ImGui::PushItemWidth(100);
+    if (ImGui::DragFloat("alt darkness", &altDarkness.get(), 0.01, 0., 1.)) {
+      altDarkness.manuallyChanged();
+      requestRedraw();
+    }
+    ImGui::PopItemWidth();
+    if (render::buildColormapSelector(cMap.get())) {
+      setColorMap(getColorMap());
+    }
+    break;
   case ParamVizStyle::GRID:
-    if (ImGui::ColorEdit3("base", &gridBackgroundColor.get()[0], ImGuiColorEditFlags_NoInputs))
+    ImGui::SameLine();
+    if (ImGui::ColorEdit3("##base", &gridBackgroundColor.get()[0], ImGuiColorEditFlags_NoInputs))
       setGridColors(getGridColors());
     ImGui::SameLine();
-    if (ImGui::ColorEdit3("line", &gridLineColor.get()[0], ImGuiColorEditFlags_NoInputs))
+    if (ImGui::ColorEdit3("##line", &gridLineColor.get()[0], ImGuiColorEditFlags_NoInputs))
       setGridColors(getGridColors());
     break;
   case ParamVizStyle::LOCAL_CHECK:
@@ -113,7 +122,27 @@ void ParameterizationQuantity<QuantityT>::buildParameterizationUI() {
 }
 
 template <typename QuantityT>
-void ParameterizationQuantity<QuantityT>::buildParameterizationOptionsUI() {}
+void ParameterizationQuantity<QuantityT>::buildParameterizationOptionsUI() {
+
+  // Choose viz style
+  if (ImGui::BeginMenu("Style")) {
+    for (ParamVizStyle s : {ParamVizStyle::CHECKER_ISLANDS, ParamVizStyle::CHECKER, ParamVizStyle::GRID,
+                            ParamVizStyle::LOCAL_CHECK, ParamVizStyle::LOCAL_RAD}) {
+
+      if (s == ParamVizStyle::CHECKER_ISLANDS && !haveIslandLabels()) {
+        // only allow CHECKER_ISLANDS if we actually have island labels
+        continue;
+      }
+
+      bool selected = s == getStyle();
+      std::string fancyName = styleName(s);
+      if (ImGui::MenuItem(fancyName.c_str(), NULL, selected)) {
+        setStyle(s);
+      }
+    }
+    ImGui::EndMenu();
+  }
+}
 
 template <typename QuantityT>
 std::vector<std::string> ParameterizationQuantity<QuantityT>::addParameterizationRules(std::vector<std::string> rules) {
@@ -121,6 +150,9 @@ std::vector<std::string> ParameterizationQuantity<QuantityT>::addParameterizatio
   switch (getStyle()) {
   case ParamVizStyle::CHECKER:
     rules.insert(rules.end(), {"SHADE_CHECKER_VALUE2"});
+    break;
+  case ParamVizStyle::CHECKER_ISLANDS:
+    rules.insert(rules.end(), {"SHADE_CHECKER_CATEGORY"});
     break;
   case ParamVizStyle::GRID:
     rules.insert(rules.end(), {"SHADE_GRID_VALUE2"});
@@ -140,6 +172,9 @@ template <typename QuantityT>
 void ParameterizationQuantity<QuantityT>::fillParameterizationBuffers(render::ShaderProgram& p) {
   switch (getStyle()) {
   case ParamVizStyle::CHECKER:
+    break;
+  case ParamVizStyle::CHECKER_ISLANDS:
+    p.setTextureFromColormap("t_colormap", cMap.get());
     break;
   case ParamVizStyle::GRID:
     break;
@@ -172,6 +207,9 @@ void ParameterizationQuantity<QuantityT>::setParameterizationUniforms(render::Sh
     p.setUniform("u_color1", getCheckerColors().first);
     p.setUniform("u_color2", getCheckerColors().second);
     break;
+  case ParamVizStyle::CHECKER_ISLANDS:
+    p.setUniform("u_modDarkness", getAltDarkness());
+    break;
   case ParamVizStyle::GRID:
     p.setUniform("u_gridLineColor", getGridColors().first);
     p.setUniform("u_gridBackgroundColor", getGridColors().second);
@@ -192,9 +230,23 @@ void ParameterizationQuantity<QuantityT>::updateCoords(const V& newCoords) {
   coords.markHostBufferUpdated();
 }
 
+template <typename QuantityT>
+bool ParameterizationQuantity<QuantityT>::haveIslandLabels() {
+  return islandLabelsPopulated;
+}
 
 template <typename QuantityT>
 QuantityT* ParameterizationQuantity<QuantityT>::setStyle(ParamVizStyle newStyle) {
+
+  if (newStyle == ParamVizStyle::CHECKER_ISLANDS && !haveIslandLabels()) {
+    exception("Cannot set parameterization visualization style to 'CHECKER_ISLANDS', no islands have been set");
+    newStyle = ParamVizStyle::CHECKER;
+  }
+
+  if (newStyle == ParamVizStyle::CHECKER_ISLANDS) {
+    cMap.setPassive("turbo"); // use turbo as default cmap for CHECKER_ISLANDS
+  }
+
   vizStyle = newStyle;
   quantity.refresh();
   requestRedraw();

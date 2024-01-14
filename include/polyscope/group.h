@@ -2,9 +2,12 @@
 
 #pragma once
 
-#include "polyscope/structure.h"
-
+#include <memory>
 #include <string>
+#include <unordered_set>
+
+#include "polyscope/structure.h"
+#include "polyscope/weak_handle.h"
 
 namespace polyscope {
 
@@ -14,8 +17,10 @@ namespace polyscope {
 // by the group. A structure can be in 0, 1, or multiple groups, and removing it from a group
 // does not destroy the structure.
 
-class Group {
+class Group : public virtual WeakReferrable {
+
 public:
+  // End-users should not call this constructure, use polyscope::createGroup()
   Group(std::string name);
   ~Group();
 
@@ -24,25 +29,43 @@ public:
                   // buildUI() for all children.
 
   // Is the group being displayed (0 no, 1 some children, 2 all children)
-  int isEnabled();
-  Group* setEnabled(bool newEnabled);
+  int isEnabled();                    // checks ALL descendants
+  Group* setEnabled(bool newEnabled); // updates setting for ALL descendants
 
-  void addChildGroup(Group* newChild);
-  void addChildStructure(Structure* newChild);
-  void removeChildGroup(Group* child);
-  void removeChildStructure(Structure* child);
+  void addChildGroup(Group& newChild);
+  void addChildStructure(Structure& newChild);
+  void removeChildGroup(Group& child);
+  void removeChildStructure(Structure& child);
   void unparent();
 
   bool isRootGroup();
   Group* getTopLevelGrandparent();
+  void appendStructuresToSkip(std::unordered_set<Structure*>& skipSet);
+  void appendAllDescendants(std::unordered_set<Structure*>& skipSet);
 
   std::string niceName();
+  std::string uniqueName();
+
+  Group* setShowChildDetails(bool newVal);
+  bool getShowChildDetails();
+
+  Group* setHideDescendantsFromStructureLists(bool newVal);
+  bool getHideDescendantsFromStructureLists();
 
   // === Member variables ===
-  Group* parentGroup;     // the parent group of this group (if null, this is a root group)
-  const std::string name; // a name for this group, which must be unique amongst groups on `parent`
-  std::vector<Group*> childrenGroups;
-  std::vector<Structure*> childrenStructures;
+  WeakHandle<Group> parentGroup; // the parent group of this group (if null, this is a root group)
+  const std::string name;        // a name for this group, which must be unique amongst groups on `parent`
+  std::vector<WeakHandle<Group>> childrenGroups;
+  std::vector<WeakHandle<Structure>> childrenStructures;
+
+protected:
+  // = State
+
+  PersistentValue<bool> showChildDetails;
+  PersistentValue<bool> hideDescendantsFromStructureLists;
+
+  // helpers
+  void cullExpiredChildren(); // remove any child
 };
 
 

@@ -13,7 +13,10 @@ namespace polyscope {
 
 ColorImageQuantity::ColorImageQuantity(Structure& parent_, std::string name, size_t dimX, size_t dimY,
                                        const std::vector<glm::vec4>& data_, ImageOrigin imageOrigin_)
-    : ImageQuantity(parent_, name, dimX, dimY, imageOrigin_), data(data_) {}
+    : ImageQuantity(parent_, name, dimX, dimY, imageOrigin_), colors(this, uniquePrefix() + "colors", colorsData),
+      colorsData(data_), isPremultiplied(uniquePrefix() + "isPremultiplied", false) {
+  colors.setTextureSize(dimX, dimY);
+}
 
 
 void ColorImageQuantity::buildCustomUI() {
@@ -35,37 +38,43 @@ void ColorImageQuantity::buildCustomUI() {
 
 std::string ColorImageQuantity::niceName() { return name + " (color image)"; }
 
-void ColorImageQuantity::ensureRawTexturePopulated() {
-  if (textureRaw) return; // already populated, nothing to do
-
-  // Must be rendering from a buffer of data, copy it over (common case)
-
-  textureRaw = render::engine->generateTextureBuffer(TextureFormat::RGBA32F, dimX, dimY, &(data.front()[0]));
-}
-
 void ColorImageQuantity::prepareFullscreen() {
 
-  ensureRawTexturePopulated();
-
   // Create the sourceProgram
+  // clang-format off
   fullscreenProgram =
-      render::engine->requestShader("TEXTURE_DRAW_PLAIN", {getImageOriginRule(imageOrigin), "TEXTURE_SET_TRANSPARENCY"},
+      render::engine->requestShader("TEXTURE_DRAW_PLAIN",
+                                    {
+                                      getImageOriginRule(imageOrigin), 
+                                      getIsPremultiplied() ? "TEXTURE_SET_TRANSPARENCY_PREMULTIPLIED" : "TEXTURE_SET_TRANSPARENCY",
+                                      "INVERSE_TONEMAP",
+                                      getIsPremultiplied() ? "" : "TEXTURE_PREMULTIPLY_OUT"
+                                    },
                                     render::ShaderReplacementDefaults::Process);
+  // clang-format on
   fullscreenProgram->setAttribute("a_position", render::engine->screenTrianglesCoords());
-  fullscreenProgram->setTextureFromBuffer("t_image", textureRaw.get());
+  // TODO throughout polyscope we discard the shared pointer when adding textures/attributes to programs... should we
+  // just track the shared pointer?
+  fullscreenProgram->setTextureFromBuffer("t_image", colors.getRenderTextureBuffer().get());
 }
 
 void ColorImageQuantity::prepareBillboard() {
 
-  ensureRawTexturePopulated();
-
   // Create the sourceProgram
-  billboardProgram = render::engine->requestShader(
-      "TEXTURE_DRAW_PLAIN",
-      {getImageOriginRule(imageOrigin), "TEXTURE_SET_TRANSPARENCY", "TEXTURE_BILLBOARD_FROM_UNIFORMS"},
-      render::ShaderReplacementDefaults::Process);
+  // clang-format off
+  billboardProgram = 
+    render::engine->requestShader("TEXTURE_DRAW_PLAIN",
+                                  {
+                                    getImageOriginRule(imageOrigin), 
+                                    getIsPremultiplied() ? "TEXTURE_SET_TRANSPARENCY_PREMULTIPLIED" : "TEXTURE_SET_TRANSPARENCY",
+                                    "TEXTURE_BILLBOARD_FROM_UNIFORMS", 
+                                    "INVERSE_TONEMAP",
+                                    getIsPremultiplied() ? "" : "TEXTURE_PREMULTIPLY_OUT"
+                                  },
+                                 render::ShaderReplacementDefaults::Process);
+  // clang-format on
   billboardProgram->setAttribute("a_position", render::engine->screenTrianglesCoords());
-  billboardProgram->setTextureFromBuffer("t_image", textureRaw.get());
+  billboardProgram->setTextureFromBuffer("t_image", colors.getRenderTextureBuffer().get());
 }
 
 void ColorImageQuantity::showFullscreen() {
@@ -74,8 +83,12 @@ void ColorImageQuantity::showFullscreen() {
     prepareFullscreen();
   }
 
+  render::engine->setBlendMode(
+      BlendMode::AlphaOver); // WARNING: I never really thought through this, may cause problems
+
   // Set uniforms
   fullscreenProgram->setUniform("u_transparency", getTransparency());
+  render::engine->setTonemapUniforms(*fullscreenProgram);
 
   fullscreenProgram->draw();
 
@@ -84,8 +97,6 @@ void ColorImageQuantity::showFullscreen() {
 
 
 void ColorImageQuantity::showInImGuiWindow() {
-  if (!fullscreenProgram) prepareFullscreen();
-  ensureRawTexturePopulated();
 
   ImGui::Begin(name.c_str(), nullptr, ImGuiWindowFlags_NoScrollbar);
 
@@ -96,9 +107,9 @@ void ColorImageQuantity::showInImGuiWindow() {
 
   // since we are showing directly from the user's texture, we need to resposect the upper left ordering
   if (imageOrigin == ImageOrigin::LowerLeft) {
-    ImGui::Image(textureRaw->getNativeHandle(), ImVec2(w, h), ImVec2(0, 1), ImVec2(1, 0));
+    ImGui::Image(colors.getRenderTextureBuffer()->getNativeHandle(), ImVec2(w, h), ImVec2(0, 1), ImVec2(1, 0));
   } else if (imageOrigin == ImageOrigin::UpperLeft) {
-    ImGui::Image(textureRaw->getNativeHandle(), ImVec2(w, h));
+    ImGui::Image(colors.getRenderTextureBuffer()->getNativeHandle(), ImVec2(w, h));
   }
 
   ImGui::End();
@@ -119,6 +130,7 @@ void ColorImageQuantity::showInBillboard(glm::vec3 center, glm::vec3 upVec, glm:
   billboardProgram->setUniform("u_billboardCenter", center);
   billboardProgram->setUniform("u_billboardUp", upVec);
   billboardProgram->setUniform("u_billboardRight", rightVec);
+  render::engine->setTonemapUniforms(*billboardProgram);
 
   render::engine->setBackfaceCull(false);
   render::engine->setBlendMode(
@@ -146,6 +158,14 @@ ColorImageQuantity* ColorImageQuantity::setEnabled(bool newEnabled) {
   requestRedraw();
   return this;
 }
+
+ColorImageQuantity* ColorImageQuantity::setIsPremultiplied(bool val) {
+  isPremultiplied = val;
+  refresh();
+  return this;
+}
+
+bool ColorImageQuantity::getIsPremultiplied() { return isPremultiplied.get(); }
 
 
 // Instantiate a construction helper which is used to avoid header dependencies. See forward declaration and note in

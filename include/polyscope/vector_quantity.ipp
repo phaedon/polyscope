@@ -12,11 +12,11 @@ namespace polyscope {
 template <typename QuantityT>
 VectorQuantityBase<QuantityT>::VectorQuantityBase(QuantityT& quantity_, VectorType vectorType_)
     : quantity(quantity_), vectorType(vectorType_),
-      vectorLengthMult(quantity.uniquePrefix() + "#vectorLengthMult",
+      vectorLengthMult(quantity.uniquePrefix() + "vectorLengthMult",
                        vectorType == VectorType::AMBIENT ? absoluteValue(1.0) : relativeValue(0.02)),
-      vectorRadius(quantity.uniquePrefix() + "#vectorRadius", relativeValue(0.0025)),
-      vectorColor(quantity.uniquePrefix() + "#vectorColor", getNextUniqueColor()),
-      material(quantity.uniquePrefix() + "#material", "clay") {}
+      vectorRadius(quantity.uniquePrefix() + "vectorRadius", relativeValue(0.0025)),
+      vectorColor(quantity.uniquePrefix() + "vectorColor", getNextUniqueColor()),
+      material(quantity.uniquePrefix() + "material", "clay") {}
 
 template <typename QuantityT>
 void VectorQuantityBase<QuantityT>::buildVectorUI() {
@@ -106,7 +106,7 @@ glm::vec3 VectorQuantityBase<QuantityT>::getVectorColor() {
 template <typename QuantityT>
 QuantityT* VectorQuantityBase<QuantityT>::setMaterial(std::string m) {
   material = m;
-  if (vectorProgram) render::engine->setMaterial(*vectorProgram, getMaterial());
+  vectorProgram.reset();
   requestRedraw();
   return &quantity;
 }
@@ -122,8 +122,9 @@ std::string VectorQuantityBase<QuantityT>::getMaterial() {
 template <typename QuantityT>
 VectorQuantity<QuantityT>::VectorQuantity(QuantityT& quantity_, const std::vector<glm::vec3>& vectors_,
                                           render::ManagedBuffer<glm::vec3>& vectorRoots_, VectorType vectorType_)
-    : VectorQuantityBase<QuantityT>(quantity_, vectorType_), vectors(quantity_.uniquePrefix() + "#values", vectorsData),
-      vectorRoots(vectorRoots_), vectorsData(vectors_) {
+    : VectorQuantityBase<QuantityT>(quantity_, vectorType_),
+      vectors(&quantity_, quantity_.uniquePrefix() + "#values", vectorsData), vectorRoots(vectorRoots_),
+      vectorsData(vectors_) {
   this->updateMaxLength();
 }
 
@@ -137,6 +138,7 @@ void VectorQuantity<QuantityT>::drawVectors() {
   this->quantity.parent.setStructureUniforms(*(this->vectorProgram));
   this->vectorProgram->setUniform("u_radius", this->vectorRadius.get().asAbsolute());
   this->vectorProgram->setUniform("u_baseColor", this->vectorColor.get());
+  render::engine->setMaterialUniforms(*this->vectorProgram, this->material.get());
 
   if (this->vectorType == VectorType::AMBIENT) {
     this->vectorProgram->setUniform("u_lengthMult", 1.0);
@@ -166,7 +168,9 @@ void VectorQuantity<QuantityT>::createProgram() {
   // clang-format off
   this->vectorProgram = render::engine->requestShader(
       "RAYCAST_VECTOR",
-      rules
+      render::engine->addMaterialRules(this->material.get(), 
+        rules
+      )
   );
   // clang-format on
 
@@ -227,9 +231,9 @@ TangentVectorQuantity<QuantityT>::TangentVectorQuantity(QuantityT& quantity_,
                                                         VectorType vectorType_)
 
     : VectorQuantityBase<QuantityT>(quantity_, vectorType_),
-      tangentVectors(quantity_.uniquePrefix() + "#values", tangentVectorsData),
-      tangentBasisX(quantity_.uniquePrefix() + "#basisX", tangentBasisXData),
-      tangentBasisY(quantity_.uniquePrefix() + "#basisY", tangentBasisYData), vectorRoots(vectorRoots_),
+      tangentVectors(&quantity_, quantity_.uniquePrefix() + "#values", tangentVectorsData),
+      tangentBasisX(&quantity_, quantity_.uniquePrefix() + "#basisX", tangentBasisXData),
+      tangentBasisY(&quantity_, quantity_.uniquePrefix() + "#basisY", tangentBasisYData), vectorRoots(vectorRoots_),
       tangentVectorsData(tangentVectors_), tangentBasisXData(tangentBasisX_), tangentBasisYData(tangentBasisY_),
       nSym(nSym_) {
   this->updateMaxLength();
@@ -250,6 +254,7 @@ void TangentVectorQuantity<QuantityT>::drawVectors() {
     this->quantity.parent.setStructureUniforms(*(this->vectorProgram));
     this->vectorProgram->setUniform("u_radius", this->vectorRadius.get().asAbsolute());
     this->vectorProgram->setUniform("u_baseColor", this->vectorColor.get());
+    render::engine->setMaterialUniforms(*this->vectorProgram, this->material.get());
 
     if (this->vectorType == VectorType::AMBIENT) {
       this->vectorProgram->setUniform("u_lengthMult", 1.0);
@@ -279,7 +284,9 @@ void TangentVectorQuantity<QuantityT>::createProgram() {
   // clang-format off
   this->vectorProgram = render::engine->requestShader(
       "RAYCAST_TANGENT_VECTOR",
-      rules
+      render::engine->addMaterialRules(this->material.get(), 
+        rules
+      )
   );
   // clang-format on
 

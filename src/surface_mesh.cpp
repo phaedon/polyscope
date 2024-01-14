@@ -28,31 +28,31 @@ SurfaceMesh::SurfaceMesh(std::string name_)
 // == managed quantities
 
 // positions
-vertexPositions(        uniquePrefix() + "vertexPositions",     vertexPositionsData),
+vertexPositions(           this, uniquePrefix() + "vertexPositions",     vertexPositionsData),
 
 // connectivity / indices
 // (triangle and face inds are always computed initially when we triangulate the mesh)
-triangleVertexInds(     uniquePrefix() + "triangleVertexInds",          triangleVertexIndsData),
-triangleFaceInds(       uniquePrefix() + "triangleFaceInds",            triangleFaceIndsData),
-triangleCornerInds(     uniquePrefix() + "triangleCornerInds",          triangleCornerIndsData,         std::bind(&SurfaceMesh::computeTriangleCornerInds, this)),
-triangleAllEdgeInds(    uniquePrefix() + "triangleAllEdgeInds",         triangleAllEdgeIndsData,        std::bind(&SurfaceMesh::computeTriangleAllEdgeInds, this)),
-triangleAllHalfedgeInds(   uniquePrefix() + "triangleHalfedgeInds",     triangleAllHalfedgeIndsData,    std::bind(&SurfaceMesh::computeTriangleAllHalfedgeInds, this)),
-triangleAllCornerInds(     uniquePrefix() + "triangleCornerInds",       triangleAllCornerIndsData,      std::bind(&SurfaceMesh::computeTriangleAllCornerInds, this)),
+triangleVertexInds(        this, uniquePrefix() + "triangleVertexInds",          triangleVertexIndsData),
+triangleFaceInds(          this, uniquePrefix() + "triangleFaceInds",            triangleFaceIndsData),
+triangleCornerInds(        this, uniquePrefix() + "triangleCornerInds",          triangleCornerIndsData,         std::bind(&SurfaceMesh::computeTriangleCornerInds, this)),
+triangleAllEdgeInds(       this, uniquePrefix() + "triangleAllEdgeInds",         triangleAllEdgeIndsData,        std::bind(&SurfaceMesh::computeTriangleAllEdgeInds, this)),
+triangleAllHalfedgeInds(   this, uniquePrefix() + "triangleHalfedgeInds",     triangleAllHalfedgeIndsData,    std::bind(&SurfaceMesh::computeTriangleAllHalfedgeInds, this)),
+triangleAllCornerInds(     this, uniquePrefix() + "triangleAllCornerInds",    triangleAllCornerIndsData,      std::bind(&SurfaceMesh::computeTriangleAllCornerInds, this)),
 
 // internal triangle data for rendering
-baryCoord(              uniquePrefix() + "baryCoord",           baryCoordData),
-edgeIsReal(             uniquePrefix() + "edgeIsReal",          edgeIsRealData),
+baryCoord(              this, uniquePrefix() + "baryCoord",           baryCoordData),
+edgeIsReal(             this, uniquePrefix() + "edgeIsReal",          edgeIsRealData),
 
 // other internally-computed geometry
-faceNormals(            uniquePrefix() + "faceNormals",         faceNormalsData,        std::bind(&SurfaceMesh::computeFaceNormals, this)),
-faceCenters(            uniquePrefix() + "faceCenters",         faceCentersData,        std::bind(&SurfaceMesh::computeFaceCenters, this)),         
-faceAreas(              uniquePrefix() + "faceAreas",           faceAreasData,          std::bind(&SurfaceMesh::computeFaceAreas, this)),
-vertexNormals(          uniquePrefix() + "vertexNormals",       vertexNormalsData,      std::bind(&SurfaceMesh::computeVertexNormals, this)),
-vertexAreas(            uniquePrefix() + "vertexAreas",         vertexAreasData,        std::bind(&SurfaceMesh::computeVertexAreas, this)),
+faceNormals(            this, uniquePrefix() + "faceNormals",         faceNormalsData,        std::bind(&SurfaceMesh::computeFaceNormals, this)),
+faceCenters(            this, uniquePrefix() + "faceCenters",         faceCentersData,        std::bind(&SurfaceMesh::computeFaceCenters, this)),         
+faceAreas(              this, uniquePrefix() + "faceAreas",           faceAreasData,          std::bind(&SurfaceMesh::computeFaceAreas, this)),
+vertexNormals(          this, uniquePrefix() + "vertexNormals",       vertexNormalsData,      std::bind(&SurfaceMesh::computeVertexNormals, this)),
+vertexAreas(            this, uniquePrefix() + "vertexAreas",         vertexAreasData,        std::bind(&SurfaceMesh::computeVertexAreas, this)),
 
 // tangent spaces
-defaultFaceTangentBasisX(   uniquePrefix() + "defaultFaceTangentBasisX",  defaultFaceTangentBasisXData,  std::bind(&SurfaceMesh::computeDefaultFaceTangentBasisX, this)),
-defaultFaceTangentBasisY(   uniquePrefix() + "defaultFaceTangentBasisY",  defaultFaceTangentBasisYData,  std::bind(&SurfaceMesh::computeDefaultFaceTangentBasisY, this)),
+defaultFaceTangentBasisX(   this, uniquePrefix() + "defaultFaceTangentBasisX",  defaultFaceTangentBasisXData,  std::bind(&SurfaceMesh::computeDefaultFaceTangentBasisX, this)),
+defaultFaceTangentBasisY(   this, uniquePrefix() + "defaultFaceTangentBasisY",  defaultFaceTangentBasisYData,  std::bind(&SurfaceMesh::computeDefaultFaceTangentBasisY, this)),
 
 // == persistent options
 surfaceColor(           uniquePrefix() + "surfaceColor",    getNextUniqueColor()),
@@ -713,6 +713,7 @@ void SurfaceMesh::draw() {
     setStructureUniforms(*program);
     setSurfaceMeshUniforms(*program);
     program->setUniform("u_baseColor", getSurfaceColor());
+    render::engine->setMaterialUniforms(*program, getMaterial());
 
     program->draw();
   }
@@ -768,9 +769,10 @@ void SurfaceMesh::drawPick() {
 
 void SurfaceMesh::prepare() {
   // clang-format off
-  program = render::engine->requestShader(
-      "MESH", 
-      addSurfaceMeshRules({"SHADE_BASECOLOR"})
+  program = render::engine->requestShader( "MESH", 
+      render::engine->addMaterialRules(getMaterial(),
+        addSurfaceMeshRules({"SHADE_BASECOLOR"})
+      )
   );
   // clang-format on
 
@@ -953,12 +955,29 @@ void SurfaceMesh::setMeshPickAttributes(render::ShaderProgram& p) {
     }
   }
 
-  // Store data in buffers
-  pickProgram->setAttribute<glm::vec3, 3>("a_vertexColors", vertexColors);
-  pickProgram->setAttribute("a_faceColor", faceColor);
+  // == Store data in buffers
+
+  std::shared_ptr<render::AttributeBuffer> vertexColorsBuff =
+      render::engine->generateAttributeBuffer(RenderDataType::Vector3Float, 3);
+  vertexColorsBuff->setData(vertexColors);
+  pickProgram->setAttribute("a_vertexColors", vertexColorsBuff);
+
+  std::shared_ptr<render::AttributeBuffer> faceColorsBuff =
+      render::engine->generateAttributeBuffer(RenderDataType::Vector3Float);
+  faceColorsBuff->setData(faceColor);
+  pickProgram->setAttribute("a_faceColor", faceColorsBuff);
+
   if (!simplePick) {
-    pickProgram->setAttribute<glm::vec3, 3>("a_halfedgeColors", halfedgeColors);
-    pickProgram->setAttribute<glm::vec3, 3>("a_cornerColors", cornerColors);
+
+    std::shared_ptr<render::AttributeBuffer> halfedgeColorsBuff =
+        render::engine->generateAttributeBuffer(RenderDataType::Vector3Float, 3);
+    halfedgeColorsBuff->setData(halfedgeColors);
+    pickProgram->setAttribute("a_halfedgeColors", halfedgeColorsBuff);
+
+    std::shared_ptr<render::AttributeBuffer> cornerColorsBuff =
+        render::engine->generateAttributeBuffer(RenderDataType::Vector3Float, 3);
+    cornerColorsBuff->setData(cornerColors);
+    pickProgram->setAttribute("a_cornerColors", cornerColorsBuff);
   }
 }
 
@@ -972,11 +991,13 @@ std::vector<std::string> SurfaceMesh::addSurfaceMeshRules(std::vector<std::strin
     if (withSurfaceShade) {
       // rules that only get used when we're shading the surface of the mesh
       if (getEdgeWidth() > 0) {
+        initRules.push_back("MESH_WIREFRAME_FROM_BARY");
         initRules.push_back("MESH_WIREFRAME");
       }
 
       if (shadeStyle.get() == MeshShadeStyle::TriFlat) {
-        initRules.push_back("MESH_COMPUTE_NORMAL_FROM_POSITION");
+        initRules.push_back("COMPUTE_SHADE_NORMAL_FROM_POSITION");
+        initRules.push_back("PROJ_AND_INV_PROJ_MAT");
       }
 
       if (backFacePolicy.get() == BackFacePolicy::Different) {
@@ -1487,6 +1508,7 @@ MeshShadeStyle SurfaceMesh::getShadeStyle() { return shadeStyle.get(); }
 
 SurfaceVertexColorQuantity* SurfaceMesh::addVertexColorQuantityImpl(std::string name,
                                                                     const std::vector<glm::vec3>& colors) {
+  checkForQuantityWithNameAndDeleteOrError(name);
   SurfaceVertexColorQuantity* q = new SurfaceVertexColorQuantity(name, *this, colors);
   addQuantity(q);
   return q;
@@ -1494,13 +1516,24 @@ SurfaceVertexColorQuantity* SurfaceMesh::addVertexColorQuantityImpl(std::string 
 
 SurfaceFaceColorQuantity* SurfaceMesh::addFaceColorQuantityImpl(std::string name,
                                                                 const std::vector<glm::vec3>& colors) {
+  checkForQuantityWithNameAndDeleteOrError(name);
   SurfaceFaceColorQuantity* q = new SurfaceFaceColorQuantity(name, *this, colors);
   addQuantity(q);
   return q;
 }
 
+SurfaceTextureColorQuantity*
+SurfaceMesh::addTextureColorQuantityImpl(std::string name, SurfaceParameterizationQuantity& param, size_t dimX,
+                                         size_t dimY, const std::vector<glm::vec3>& colors, ImageOrigin imageOrigin) {
+  checkForQuantityWithNameAndDeleteOrError(name);
+  SurfaceTextureColorQuantity* q = new SurfaceTextureColorQuantity(name, *this, param, dimX, dimY, colors, imageOrigin);
+  addQuantity(q);
+  return q;
+}
+
 SurfaceVertexScalarQuantity* SurfaceMesh::addVertexDistanceQuantityImpl(std::string name,
-                                                                        const std::vector<double>& data) {
+                                                                        const std::vector<float>& data) {
+  checkForQuantityWithNameAndDeleteOrError(name);
   SurfaceVertexScalarQuantity* q = new SurfaceVertexScalarQuantity(name, data, *this, DataType::MAGNITUDE);
 
   q->setIsolinesEnabled(true);
@@ -1511,7 +1544,8 @@ SurfaceVertexScalarQuantity* SurfaceMesh::addVertexDistanceQuantityImpl(std::str
 }
 
 SurfaceVertexScalarQuantity* SurfaceMesh::addVertexSignedDistanceQuantityImpl(std::string name,
-                                                                              const std::vector<double>& data) {
+                                                                              const std::vector<float>& data) {
+  checkForQuantityWithNameAndDeleteOrError(name);
   SurfaceVertexScalarQuantity* q = new SurfaceVertexScalarQuantity(name, data, *this, DataType::SYMMETRIC);
 
   q->setIsolinesEnabled(true);
@@ -1524,6 +1558,7 @@ SurfaceVertexScalarQuantity* SurfaceMesh::addVertexSignedDistanceQuantityImpl(st
 SurfaceCornerParameterizationQuantity*
 SurfaceMesh::addParameterizationQuantityImpl(std::string name, const std::vector<glm::vec2>& coords,
                                              ParamCoordsType type) {
+  checkForQuantityWithNameAndDeleteOrError(name);
   SurfaceCornerParameterizationQuantity* q =
       new SurfaceCornerParameterizationQuantity(name, *this, coords, type, ParamVizStyle::CHECKER);
   addQuantity(q);
@@ -1534,6 +1569,7 @@ SurfaceMesh::addParameterizationQuantityImpl(std::string name, const std::vector
 SurfaceVertexParameterizationQuantity*
 SurfaceMesh::addVertexParameterizationQuantityImpl(std::string name, const std::vector<glm::vec2>& coords,
                                                    ParamCoordsType type) {
+  checkForQuantityWithNameAndDeleteOrError(name);
   SurfaceVertexParameterizationQuantity* q =
       new SurfaceVertexParameterizationQuantity(name, *this, coords, type, ParamVizStyle::CHECKER);
   addQuantity(q);
@@ -1544,6 +1580,7 @@ SurfaceMesh::addVertexParameterizationQuantityImpl(std::string name, const std::
 SurfaceVertexParameterizationQuantity*
 SurfaceMesh::addLocalParameterizationQuantityImpl(std::string name, const std::vector<glm::vec2>& coords,
                                                   ParamCoordsType type) {
+  checkForQuantityWithNameAndDeleteOrError(name);
   SurfaceVertexParameterizationQuantity* q =
       new SurfaceVertexParameterizationQuantity(name, *this, coords, type, ParamVizStyle::LOCAL_CHECK);
   addQuantity(q);
@@ -1551,23 +1588,26 @@ SurfaceMesh::addLocalParameterizationQuantityImpl(std::string name, const std::v
   return q;
 }
 
-SurfaceVertexScalarQuantity* SurfaceMesh::addVertexScalarQuantityImpl(std::string name, const std::vector<double>& data,
+SurfaceVertexScalarQuantity* SurfaceMesh::addVertexScalarQuantityImpl(std::string name, const std::vector<float>& data,
                                                                       DataType type) {
+  checkForQuantityWithNameAndDeleteOrError(name);
   SurfaceVertexScalarQuantity* q = new SurfaceVertexScalarQuantity(name, data, *this, type);
   addQuantity(q);
   return q;
 }
 
-SurfaceFaceScalarQuantity* SurfaceMesh::addFaceScalarQuantityImpl(std::string name, const std::vector<double>& data,
+SurfaceFaceScalarQuantity* SurfaceMesh::addFaceScalarQuantityImpl(std::string name, const std::vector<float>& data,
                                                                   DataType type) {
+  checkForQuantityWithNameAndDeleteOrError(name);
   SurfaceFaceScalarQuantity* q = new SurfaceFaceScalarQuantity(name, data, *this, type);
   addQuantity(q);
   return q;
 }
 
 
-SurfaceEdgeScalarQuantity* SurfaceMesh::addEdgeScalarQuantityImpl(std::string name, const std::vector<double>& data,
+SurfaceEdgeScalarQuantity* SurfaceMesh::addEdgeScalarQuantityImpl(std::string name, const std::vector<float>& data,
                                                                   DataType type) {
+  checkForQuantityWithNameAndDeleteOrError(name);
   SurfaceEdgeScalarQuantity* q = new SurfaceEdgeScalarQuantity(name, data, *this, type);
   addQuantity(q);
   markEdgesAsUsed();
@@ -1575,24 +1615,40 @@ SurfaceEdgeScalarQuantity* SurfaceMesh::addEdgeScalarQuantityImpl(std::string na
 }
 
 SurfaceHalfedgeScalarQuantity*
-SurfaceMesh::addHalfedgeScalarQuantityImpl(std::string name, const std::vector<double>& data, DataType type) {
+SurfaceMesh::addHalfedgeScalarQuantityImpl(std::string name, const std::vector<float>& data, DataType type) {
+  checkForQuantityWithNameAndDeleteOrError(name);
   SurfaceHalfedgeScalarQuantity* q = new SurfaceHalfedgeScalarQuantity(name, data, *this, type);
   addQuantity(q);
   markHalfedgesAsUsed();
   return q;
 }
 
-SurfaceCornerScalarQuantity* SurfaceMesh::addCornerScalarQuantityImpl(std::string name, const std::vector<double>& data,
+SurfaceCornerScalarQuantity* SurfaceMesh::addCornerScalarQuantityImpl(std::string name, const std::vector<float>& data,
                                                                       DataType type) {
+  checkForQuantityWithNameAndDeleteOrError(name);
   SurfaceCornerScalarQuantity* q = new SurfaceCornerScalarQuantity(name, data, *this, type);
   addQuantity(q);
   markCornersAsUsed();
   return q;
 }
 
+
+SurfaceTextureScalarQuantity* SurfaceMesh::addTextureScalarQuantityImpl(std::string name,
+                                                                        SurfaceParameterizationQuantity& param,
+                                                                        size_t dimX, size_t dimY,
+                                                                        const std::vector<float>& data,
+                                                                        ImageOrigin imageOrigin, DataType type) {
+  checkForQuantityWithNameAndDeleteOrError(name);
+  SurfaceTextureScalarQuantity* q =
+      new SurfaceTextureScalarQuantity(name, *this, param, dimX, dimY, data, imageOrigin, type);
+  addQuantity(q);
+  return q;
+}
+
 SurfaceVertexVectorQuantity* SurfaceMesh::addVertexVectorQuantityImpl(std::string name,
                                                                       const std::vector<glm::vec3>& vectors,
                                                                       VectorType vectorType) {
+  checkForQuantityWithNameAndDeleteOrError(name);
   SurfaceVertexVectorQuantity* q = new SurfaceVertexVectorQuantity(name, vectors, *this, vectorType);
   addQuantity(q);
   return q;
@@ -1601,6 +1657,7 @@ SurfaceVertexVectorQuantity* SurfaceMesh::addVertexVectorQuantityImpl(std::strin
 SurfaceFaceVectorQuantity*
 SurfaceMesh::addFaceVectorQuantityImpl(std::string name, const std::vector<glm::vec3>& vectors, VectorType vectorType) {
 
+  checkForQuantityWithNameAndDeleteOrError(name);
   SurfaceFaceVectorQuantity* q = new SurfaceFaceVectorQuantity(name, vectors, *this, vectorType);
   addQuantity(q);
   return q;
@@ -1612,6 +1669,7 @@ SurfaceFaceTangentVectorQuantity* SurfaceMesh::addFaceTangentVectorQuantityImpl(
                                                                                 const std::vector<glm::vec3>& basisY,
                                                                                 int nSym, VectorType vectorType) {
 
+  checkForQuantityWithNameAndDeleteOrError(name);
   SurfaceFaceTangentVectorQuantity* q =
       new SurfaceFaceTangentVectorQuantity(name, vectors, basisX, basisY, *this, nSym, vectorType);
   addQuantity(q);
@@ -1623,6 +1681,7 @@ SurfaceVertexTangentVectorQuantity*
 SurfaceMesh::addVertexTangentVectorQuantityImpl(std::string name, const std::vector<glm::vec2>& vectors,
                                                 const std::vector<glm::vec3>& basisX,
                                                 const std::vector<glm::vec3>& basisY, int nSym, VectorType vectorType) {
+  checkForQuantityWithNameAndDeleteOrError(name);
   SurfaceVertexTangentVectorQuantity* q =
       new SurfaceVertexTangentVectorQuantity(name, vectors, basisX, basisY, *this, nSym, vectorType);
   addQuantity(q);
@@ -1632,13 +1691,21 @@ SurfaceMesh::addVertexTangentVectorQuantityImpl(std::string name, const std::vec
 // Orientations is `true` if the canonical orientation of the edge points from the lower-indexed vertex to the
 // higher-indexed vertex, and `false` otherwise.
 SurfaceOneFormTangentVectorQuantity*
-SurfaceMesh::addOneFormTangentVectorQuantityImpl(std::string name, const std::vector<double>& data,
+SurfaceMesh::addOneFormTangentVectorQuantityImpl(std::string name, const std::vector<float>& data,
                                                  const std::vector<char>& orientations) {
+  checkForQuantityWithNameAndDeleteOrError(name);
   SurfaceOneFormTangentVectorQuantity* q = new SurfaceOneFormTangentVectorQuantity(name, data, orientations, *this);
   addQuantity(q);
   markEdgesAsUsed();
   return q;
 }
+
+SurfaceParameterizationQuantity* SurfaceMesh::getParameterization(std::string name) {
+  SurfaceMeshQuantity* newQ = this->getQuantity(name);
+  SurfaceParameterizationQuantity* param = dynamic_cast<SurfaceParameterizationQuantity*>(newQ);
+  return param;
+}
+
 
 SurfaceMeshQuantity::SurfaceMeshQuantity(std::string name, SurfaceMesh& parentStructure, bool dominates)
     : QuantityS<SurfaceMesh>(name, parentStructure, dominates) {}

@@ -2,7 +2,9 @@
 
 
 #include "polyscope/utilities.h"
+
 #include <stdexcept>
+
 namespace polyscope {
 
 // Shorthand to add a mesh to polyscope
@@ -36,6 +38,26 @@ SurfaceMesh* registerSurfaceMesh2D(std::string name, const V& vertexPositions, c
   }
 
   return registerSurfaceMesh(name, positions3D, faceIndices);
+}
+
+template <class V, class F, class P>
+SurfaceMesh* registerSurfaceMesh(std::string name, const V& vertexPositions, const F& faceIndices,
+                                 const std::array<std::pair<P, size_t>, 3>& perms) {
+  SurfaceMesh* mesh = registerSurfaceMesh(name, vertexPositions, faceIndices);
+  if (mesh) {
+    mesh->setAllPermutations(perms);
+  }
+  return mesh;
+}
+
+template <class V, class F, class P>
+SurfaceMesh* registerSurfaceMesh(std::string name, const V& vertexPositions, const F& faceIndices,
+                                 const std::array<std::pair<P, size_t>, 5>& perms) {
+  SurfaceMesh* mesh = registerSurfaceMesh(name, vertexPositions, faceIndices);
+  if (mesh) {
+    mesh->setAllPermutations(perms);
+  }
+  return mesh;
 }
 
 template <class V>
@@ -175,7 +197,7 @@ template <class T>
 void SurfaceMesh::setAllPermutations(const std::array<std::pair<T, size_t>, 5>& perms) {
   // (kept for backward compatbility only)
   // forward to the 3-arg version, ignoring the unused ones
-  setAllPermutations(std::array<std::pair<T, size_t>, 2>{perms[2], perms[3], perms[4]});
+  setAllPermutations(std::array<std::pair<T, size_t>, 3>{perms[2], perms[3], perms[4]});
 }
 
 template <class T>
@@ -211,15 +233,40 @@ SurfaceFaceColorQuantity* SurfaceMesh::addFaceColorQuantity(std::string name, co
 }
 
 template <class T>
+SurfaceTextureColorQuantity*
+SurfaceMesh::addTextureColorQuantity(std::string name, SurfaceParameterizationQuantity& param, size_t dimX, size_t dimY,
+                                     const T& colors, ImageOrigin imageOrigin) {
+  validateSize<T>(colors, dimX * dimY, "texture color quantity " + name);
+  return addTextureColorQuantityImpl(name, param, dimX, dimY, standardizeVectorArray<glm::vec3, 3>(colors),
+                                     imageOrigin);
+}
+
+template <class T>
+SurfaceTextureColorQuantity* SurfaceMesh::addTextureColorQuantity(std::string name, std::string paramName, size_t dimX,
+                                                                  size_t dimY, const T& colors,
+                                                                  ImageOrigin imageOrigin) {
+
+
+  SurfaceParameterizationQuantity* param = getParameterization(paramName);
+  if (!param) {
+    exception("could not find surface parameterization " + paramName);
+  }
+
+  // call the main adder
+  return addTextureColorQuantity(name, *param, dimX, dimY, colors, imageOrigin);
+}
+
+
+template <class T>
 SurfaceVertexScalarQuantity* SurfaceMesh::addVertexDistanceQuantity(std::string name, const T& distances) {
   validateSize(distances, vertexDataSize, "distance quantity " + name);
-  return addVertexDistanceQuantityImpl(name, standardizeArray<double>(distances));
+  return addVertexDistanceQuantityImpl(name, standardizeArray<float>(distances));
 }
 
 template <class T>
 SurfaceVertexScalarQuantity* SurfaceMesh::addVertexSignedDistanceQuantity(std::string name, const T& distances) {
   validateSize(distances, vertexDataSize, "signed distance quantity " + name);
-  return addVertexSignedDistanceQuantityImpl(name, standardizeArray<double>(distances));
+  return addVertexSignedDistanceQuantityImpl(name, standardizeArray<float>(distances));
 }
 
 // Standard a parameterization, defined at corners
@@ -249,13 +296,13 @@ SurfaceVertexParameterizationQuantity* SurfaceMesh::addLocalParameterizationQuan
 template <class T>
 SurfaceVertexScalarQuantity* SurfaceMesh::addVertexScalarQuantity(std::string name, const T& data, DataType type) {
   validateSize(data, vertexDataSize, "vertex scalar quantity " + name);
-  return addVertexScalarQuantityImpl(name, standardizeArray<double, T>(data), type);
+  return addVertexScalarQuantityImpl(name, standardizeArray<float, T>(data), type);
 }
 
 template <class T>
 SurfaceFaceScalarQuantity* SurfaceMesh::addFaceScalarQuantity(std::string name, const T& data, DataType type) {
   validateSize(data, faceDataSize, "face scalar quantity " + name);
-  return addFaceScalarQuantityImpl(name, standardizeArray<double, T>(data), type);
+  return addFaceScalarQuantityImpl(name, standardizeArray<float, T>(data), type);
 }
 
 
@@ -266,21 +313,42 @@ SurfaceEdgeScalarQuantity* SurfaceMesh::addEdgeScalarQuantity(std::string name, 
               " attempted to set edge-valued data, but this requires an edge ordering. Call setEdgePermutation().");
   }
   validateSize(data, edgeDataSize, "edge scalar quantity " + name);
-  return addEdgeScalarQuantityImpl(name, standardizeArray<double, T>(data), type);
+  return addEdgeScalarQuantityImpl(name, standardizeArray<float, T>(data), type);
 }
 
 template <class T>
 SurfaceHalfedgeScalarQuantity* SurfaceMesh::addHalfedgeScalarQuantity(std::string name, const T& data, DataType type) {
   validateSize(data, halfedgeDataSize, "halfedge scalar quantity " + name);
-  return addHalfedgeScalarQuantityImpl(name, standardizeArray<double, T>(data), type);
+  return addHalfedgeScalarQuantityImpl(name, standardizeArray<float, T>(data), type);
 }
 
 template <class T>
 SurfaceCornerScalarQuantity* SurfaceMesh::addCornerScalarQuantity(std::string name, const T& data, DataType type) {
   validateSize(data, cornerDataSize, "corner scalar quantity " + name);
-  return addCornerScalarQuantityImpl(name, standardizeArray<double, T>(data), type);
+  return addCornerScalarQuantityImpl(name, standardizeArray<float, T>(data), type);
 }
 
+template <class T>
+SurfaceTextureScalarQuantity*
+SurfaceMesh::addTextureScalarQuantity(std::string name, SurfaceParameterizationQuantity& param, size_t dimX,
+                                      size_t dimY, const T& values, ImageOrigin imageOrigin, DataType type) {
+  validateSize<T>(values, dimX * dimY, "texture color quantity " + name);
+  return addTextureScalarQuantityImpl(name, param, dimX, dimY, standardizeArray<float, T>(values), imageOrigin, type);
+}
+
+template <class T>
+SurfaceTextureScalarQuantity* SurfaceMesh::addTextureScalarQuantity(std::string name, std::string paramName,
+                                                                    size_t dimX, size_t dimY, const T& values,
+                                                                    ImageOrigin imageOrigin, DataType type) {
+
+  SurfaceParameterizationQuantity* param = getParameterization(paramName);
+  if (!param) {
+    exception("could not find surface parameterization " + paramName);
+  }
+
+  // call the main adder
+  return addTextureScalarQuantity(name, *param, dimX, dimY, values, imageOrigin, type);
+}
 
 template <class T>
 SurfaceVertexVectorQuantity* SurfaceMesh::addVertexVectorQuantity(std::string name, const T& vectors,
@@ -353,7 +421,7 @@ SurfaceOneFormTangentVectorQuantity* SurfaceMesh::addOneFormTangentVectorQuantit
               " attempted to set edge-valued data, but this requires an edge ordering. Call setEdgePermutation().");
   }
   validateSize(data, edgeDataSize, "one form tangent vector quantity " + name);
-  return addOneFormTangentVectorQuantityImpl(name, standardizeArray<double, T>(data),
+  return addOneFormTangentVectorQuantityImpl(name, standardizeArray<float, T>(data),
                                              standardizeArray<char, O>(orientations));
 }
 

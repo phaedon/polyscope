@@ -85,6 +85,21 @@ const ShaderReplacementRule SHADE_BASECOLOR (
     /* textures */ {}
 );
 
+// input: uniform output: vec3 shadeColor
+const ShaderReplacementRule SHADECOLOR_FROM_UNIFORM (
+    /* rule name */ "SHADECOLOR_FROM_UNIFORM",
+    { /* replacement sources */
+      {"FRAG_DECLARATIONS", R"(
+          uniform vec3 u_color;
+        )"},
+      {"GENERATE_SHADE_COLOR", "vec3 shadeColor = u_color;"}
+    },
+    /* uniforms */ {
+      {"u_color", RenderDataType::Vector3Float},
+    },
+    /* attributes */ {},
+    /* textures */ {}
+);
 
 // input: vec3 shadeColor 
 // output: vec3 albedoColor
@@ -188,6 +203,7 @@ const ShaderReplacementRule SHADE_CHECKER_VALUE2 (
           uniform vec3 u_color2;
         )"},
       {"GENERATE_SHADE_COLOR", R"(
+        // NOTE checker math shared with other shaders
         float mX = mod(shadeValue2.x, 2.0 * u_modLen) / u_modLen - 1.f; // in [-1, 1]
         float mY = mod(shadeValue2.y, 2.0 * u_modLen) / u_modLen - 1.f;
         float minD = min( min(abs(mX), 1.0 - abs(mX)), min(abs(mY), 1.0 - abs(mY))) * 2.; // rect distace from flipping sign in [0,1]
@@ -207,6 +223,46 @@ const ShaderReplacementRule SHADE_CHECKER_VALUE2 (
     },
     /* attributes */ {},
     /* textures */ {}
+);
+
+const ShaderReplacementRule SHADE_CHECKER_CATEGORY(
+    /* rule name */ "SHADE_CHECKER_CATEGORY",
+    { /* replacement sources */
+      {"FRAG_DECLARATIONS", R"(
+          uniform float u_modLen;
+          uniform float u_modDarkness;
+          uniform sampler1D t_colormap;
+
+          float intToDistinctReal(float start, int index);
+        )"},
+      {"GENERATE_SHADE_COLOR", R"(
+        // sample the categorical color
+        float catVal = intToDistinctReal(0., int(shadeValue));
+        float scaleFac = 1.2f; // pump up the brightness a bit, so the modDarkness doesn't make it too dark
+        vec3 catColor = scaleFac * texture(t_colormap, catVal).rgb;
+        vec3 catColorDark = catColor * u_modDarkness;
+
+        // NOTE checker math shared with other shaders
+        float mX = mod(shadeValue2.x, 2.0 * u_modLen) / u_modLen - 1.f; // in [-1, 1]
+        float mY = mod(shadeValue2.y, 2.0 * u_modLen) / u_modLen - 1.f;
+        float minD = min( min(abs(mX), 1.0 - abs(mX)), min(abs(mY), 1.0 - abs(mY))) * 2.; // rect distace from flipping sign in [0,1]
+        float p = 6;
+        float minDSmooth = pow(minD, 1. / p);
+        // TODO do some clever screen space derivative thing to prevent aliasing
+        float v = (mX * mY); // in [-1, 1], color switches at 0
+        float adjV = sign(v) * minDSmooth;
+        float s = smoothstep(-1.f, 1.f, adjV);
+        vec3 albedoColor = mix(catColor, catColorDark, s);
+      )"}
+    },
+    /* uniforms */ {
+       {"u_modLen", RenderDataType::Float},
+       {"u_modDarkness", RenderDataType::Float},
+    },
+    /* attributes */ {},
+    /* textures */ {
+        {"t_colormap", 1}
+    }
 );
 
 // input vec2 shadeValue2
@@ -296,6 +352,52 @@ const ShaderReplacementRule GENERATE_VIEW_POS (
     /* textures */ {}
 );
 
+const ShaderReplacementRule PROJ_AND_INV_PROJ_MAT (
+    /* rule name */ "PROJ_AND_INV_PROJ_MAT",
+    { /* replacement sources */
+      {"FRAG_DECLARATIONS", R"(
+        uniform mat4 u_invProjMatrix;
+        uniform vec4 u_viewport;
+        )"}
+    },
+    /* uniforms */ {
+        {"u_invProjMatrix", RenderDataType::Matrix44Float},
+        {"u_viewport", RenderDataType::Vector4Float},
+    },
+    /* attributes */ {},
+    /* textures */ {}
+);
+
+const ShaderReplacementRule COMPUTE_SHADE_NORMAL_FROM_POSITION (
+    /* rule name */ "COMPUTE_SHADE_NORMAL_FROM_POSITION",
+    { /* replacement sources */
+      {"FRAG_DECLARATIONS", R"(
+        vec3 fragmentViewPosition(vec4 viewport, vec2 depthRange, mat4 invProjMat, vec4 fragCoord);
+        )"},
+      {"GENERATE_SHADE_VALUE", R"(
+        vec2 depthRange_fornormal = vec2(gl_DepthRange.near, gl_DepthRange.far);
+        vec3 viewPos_fornormal = fragmentViewPosition(u_viewport, depthRange_fornormal, u_invProjMatrix, gl_FragCoord);
+        shadeNormal = normalize(cross(dFdx(viewPos_fornormal),dFdy(viewPos_fornormal)));
+        )"}
+    },
+    /* uniforms */ {},
+    /* attributes */ {},
+    /* textures */ {}
+);
+
+const ShaderReplacementRule PREMULTIPLY_LIT_COLOR(
+    /* rule name */ "PREMULTIPLY_LIT_COLOR",
+    { /* replacement sources */
+      {"PERTURB_LIT_COLOR", R"(
+        litColor *= alphaOut; // premultiplied alpha
+      )"}
+    },
+    /* uniforms */ {},
+    /* attributes */ {},
+    /* textures */ {}
+);
+
+
 // TODO delete me
 const ShaderReplacementRule CULL_POS_FROM_VIEW (
     /* rule name */ "CULL_POS_FROM_VIEW",
@@ -323,6 +425,32 @@ ShaderReplacementRule generateSlicePlaneRule(std::string uniquePostfix) {
         {"FRAG_DECLARATIONS", "uniform vec3 " + centerUniformName + "; uniform vec3 " + normalUniformName + ";"},
         {"GLOBAL_FRAGMENT_FILTER", 
          "if(dot(cullPos, " + normalUniformName + ") < dot( " + centerUniformName + " , " + normalUniformName + ")) { discard; }"}
+      },
+      /* uniforms */ {
+        {centerUniformName, RenderDataType::Vector3Float},
+        {normalUniformName, RenderDataType::Vector3Float},
+      },
+      /* attributes */ {},
+      /* textures */ {}
+  );
+
+  return slicePlaneRule;
+}
+
+ShaderReplacementRule generateVolumeGridSlicePlaneRule(std::string uniquePostfix) {
+
+  std::string centerUniformName = "u_slicePlaneCenter_" + uniquePostfix;
+  std::string normalUniformName = "u_slicePlaneNormal_" + uniquePostfix;
+
+  // This takes what is otherwise a simple rule, and substitues uniquely named uniforms so that we can have multiple slice planes
+  ShaderReplacementRule slicePlaneRule (
+      /* rule name */ "SLICE_PLANE_VOLUMEGRID_CULL_" + uniquePostfix,
+      { /* replacement sources */
+        // skip the frag declarations, we will already have them from the other rule
+        // {"FRAG_DECLARATIONS", "uniform vec3 " + centerUniformName + "; uniform vec3 " + normalUniformName + ";"},
+        {"GRID_PLANE_NEIGHBOR_FILTER",
+         "if(dot(neighCullPos, " + normalUniformName + ") < dot( " + centerUniformName + " , " + normalUniformName + ")) { neighIsVisible = false; }"
+        }
       },
       /* uniforms */ {
         {centerUniformName, RenderDataType::Vector3Float},

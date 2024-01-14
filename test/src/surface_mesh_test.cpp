@@ -92,6 +92,9 @@ TEST_F(PolyscopeTest, SurfaceMeshAppearance) {
   EXPECT_FALSE(psMesh->isSmoothShade());
   polyscope::show(3);
 
+  psMesh->setShadeStyle(polyscope::MeshShadeStyle::TriFlat);
+  polyscope::show(3);
+
   // Wireframe
   psMesh->setEdgeWidth(1.);
   EXPECT_EQ(psMesh->getEdgeWidth(), 1.);
@@ -114,6 +117,33 @@ TEST_F(PolyscopeTest, SurfaceMeshPick) {
   // Do it again with edges enabled
   psMesh->setEdgeWidth(1.0);
   polyscope::pick::evaluatePickQuery(77, 88);
+
+  polyscope::removeAllStructures();
+}
+
+TEST_F(PolyscopeTest, SurfaceMeshMark) {
+  auto psMesh = registerTriangleMesh();
+
+  // edges
+  size_t nEdges = 6;
+  std::vector<size_t> ePerm = {5, 3, 1, 2, 4, 0};
+  psMesh->setEdgePermutation(ePerm);
+  psMesh->markEdgesAsUsed();
+  polyscope::show(3);
+
+  // halfedges
+  std::vector<size_t> hePerm;
+  for (size_t i = 0; i < psMesh->nCorners(); i++) {
+    hePerm.push_back(5 + i);
+  }
+  psMesh->setHalfedgePermutation(hePerm);
+  psMesh->markHalfedgesAsUsed();
+  polyscope::show(3);
+
+  // corners
+  // (permutation is not required for this one)
+  psMesh->markCornersAsUsed();
+  polyscope::show(3);
 
   polyscope::removeAllStructures();
 }
@@ -155,6 +185,27 @@ TEST_F(PolyscopeTest, SurfaceMeshColorFace) {
   std::vector<glm::vec3> fColors(psMesh->nFaces(), glm::vec3{.2, .3, .4});
   auto q2 = psMesh->addFaceColorQuantity("fColor", fColors);
   q2->setEnabled(true);
+  polyscope::show(3);
+  polyscope::removeAllStructures();
+}
+
+TEST_F(PolyscopeTest, SurfaceMeshColorTexture) {
+  auto psMesh = registerTriangleMesh();
+
+  std::vector<glm::vec2> vals(psMesh->nCorners(), {1., 2.});
+  auto qParam = psMesh->addParameterizationQuantity("param", vals);
+
+  size_t dimX = 10;
+  size_t dimY = 15;
+  std::vector<glm::vec3> colorsTex(dimX * dimY, glm::vec3{.2, .3, .4});
+  polyscope::SurfaceTextureColorQuantity* qColor =
+      psMesh->addTextureColorQuantity("tColor", *qParam, dimX, dimY, colorsTex, polyscope::ImageOrigin::UpperLeft);
+  qColor->setEnabled(true);
+
+  // make sure the by-name adder also works
+  polyscope::SurfaceTextureColorQuantity* qColor2 =
+      psMesh->addTextureColorQuantity("tColor2", "param", dimX, dimY, colorsTex, polyscope::ImageOrigin::UpperLeft);
+
   polyscope::show(3);
   polyscope::removeAllStructures();
 }
@@ -235,6 +286,27 @@ TEST_F(PolyscopeTest, SurfaceMeshScalarCornerPerm) {
   polyscope::removeAllStructures();
 }
 
+TEST_F(PolyscopeTest, SurfaceMeshScalarTexture) {
+  auto psMesh = registerTriangleMesh();
+
+  std::vector<glm::vec2> vals(psMesh->nCorners(), {1., 2.});
+  auto qParam = psMesh->addParameterizationQuantity("param", vals);
+
+  size_t dimX = 10;
+  size_t dimY = 15;
+  std::vector<float> valuesTex(dimX * dimY, 0.77);
+  polyscope::SurfaceTextureScalarQuantity* qScalar =
+      psMesh->addTextureScalarQuantity("tScalar", *qParam, dimX, dimY, valuesTex, polyscope::ImageOrigin::UpperLeft);
+  qScalar->setEnabled(true);
+
+  // make sure the by-name adder also works
+  polyscope::SurfaceTextureScalarQuantity* qScalar2 =
+      psMesh->addTextureScalarQuantity("tScalar2", "param", dimX, dimY, valuesTex, polyscope::ImageOrigin::UpperLeft);
+
+  polyscope::show(3);
+  polyscope::removeAllStructures();
+}
+
 TEST_F(PolyscopeTest, SurfaceMeshDistance) {
   auto psMesh = registerTriangleMesh();
   std::vector<double> vScalar(psMesh->nVertices(), 7.);
@@ -269,6 +341,17 @@ TEST_F(PolyscopeTest, SurfaceMeshCornerParam) {
   q1->setStyle(polyscope::ParamVizStyle::LOCAL_CHECK);
   polyscope::show(3);
   q1->setStyle(polyscope::ParamVizStyle::LOCAL_RAD);
+  polyscope::show(3);
+
+  // set islands
+  std::vector<int32_t> islandLabels(psMesh->nFaces(), 0);
+  q1->setIslandLabels(islandLabels);
+  q1->setStyle(polyscope::ParamVizStyle::CHECKER_ISLANDS);
+  polyscope::show(3);
+
+
+  // create the curve network
+  q1->createCurveNetworkFromSeams();
   polyscope::show(3);
 
   polyscope::removeAllStructures();
@@ -363,5 +446,95 @@ TEST_F(PolyscopeTest, SurfaceMeshOneForm) {
   auto q1 = psMesh->addOneFormTangentVectorQuantity("one form vecs", vals, orients);
   q1->setEnabled(true);
   polyscope::show(3);
+  polyscope::removeAllStructures();
+}
+
+
+// ============================================================
+// =============== Simple Surface Mesh
+// ============================================================
+
+
+TEST_F(PolyscopeTest, ShowSimpleTriangleMesh) {
+  auto psMesh = registerSimpleTriangleMesh();
+  EXPECT_TRUE(polyscope::hasSimpleTriangleMesh("test1"));
+
+  // Make sure we actually added the mesh
+  polyscope::show(3);
+  EXPECT_TRUE(polyscope::hasSimpleTriangleMesh("test1"));
+  EXPECT_FALSE(polyscope::hasSimpleTriangleMesh("test2"));
+  polyscope::removeAllStructures();
+  EXPECT_FALSE(polyscope::hasSimpleTriangleMesh("test1"));
+}
+
+TEST_F(PolyscopeTest, SimpleTriangleMeshAppearance) {
+  auto psMesh = registerSimpleTriangleMesh();
+
+  // Material
+  psMesh->setMaterial("wax");
+  EXPECT_EQ(psMesh->getMaterial(), "wax");
+  polyscope::show(3);
+
+  polyscope::removeAllStructures();
+}
+
+TEST_F(PolyscopeTest, SimpleTriangleMeshPick) {
+  auto psMesh = registerSimpleTriangleMesh();
+
+  // Don't bother trying to actually click on anything, but make sure this doesn't crash
+  polyscope::pick::evaluatePickQuery(77, 88);
+
+  polyscope::removeAllStructures();
+}
+
+TEST_F(PolyscopeTest, SimpleTriangleMeshBackface) {
+  auto psMesh = registerSimpleTriangleMesh();
+
+  // Same appearance
+  psMesh->setBackFacePolicy(polyscope::BackFacePolicy::Identical);
+  EXPECT_EQ(psMesh->getBackFacePolicy(), polyscope::BackFacePolicy::Identical);
+  polyscope::show(3);
+
+  // Different appearance
+  psMesh->setBackFacePolicy(polyscope::BackFacePolicy::Different);
+  EXPECT_EQ(psMesh->getBackFacePolicy(), polyscope::BackFacePolicy::Different);
+  psMesh->setBackFaceColor(glm::vec3(1.f, 0.f, 0.f));
+  EXPECT_EQ(psMesh->getBackFaceColor(), glm::vec3(1.f, 0.f, 0.f));
+  polyscope::show(3);
+
+  // Cull backfacing
+  psMesh->setBackFacePolicy(polyscope::BackFacePolicy::Cull);
+  EXPECT_EQ(psMesh->getBackFacePolicy(), polyscope::BackFacePolicy::Cull);
+  polyscope::show(3);
+
+  polyscope::removeAllStructures();
+}
+
+
+TEST_F(PolyscopeTest, SimpleTriangleMesUpdate) {
+  auto psMesh = registerSimpleTriangleMesh();
+  polyscope::show(3); // make sure everything is populated
+
+  // update just the locations
+  psMesh->updateVertices(std::vector<glm::vec3>(4));
+  polyscope::show(3);
+
+  // update the locations and faces
+  psMesh->update(std::vector<glm::vec3>(4), std::vector<glm::uvec3>(4, glm::uvec3(0, 1, 2)));
+  polyscope::show(3);
+
+  // do a bunch of resizing
+  psMesh->update(std::vector<glm::vec3>(12), std::vector<glm::uvec3>(4, glm::uvec3(0, 1, 2)));
+  polyscope::show(3);
+
+  psMesh->update(std::vector<glm::vec3>(3), std::vector<glm::uvec3>(4, glm::uvec3(0, 1, 2)));
+  polyscope::show(3);
+
+  psMesh->update(std::vector<glm::vec3>(3), std::vector<glm::uvec3>(14, glm::uvec3(0, 1, 2)));
+  polyscope::show(3);
+
+  psMesh->update(std::vector<glm::vec3>(3), std::vector<glm::uvec3>(1, glm::uvec3(0, 1, 2)));
+  polyscope::show(3);
+
   polyscope::removeAllStructures();
 }
