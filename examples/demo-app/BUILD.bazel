@@ -27,6 +27,6 @@ cc_binary(
         "//:polyscope",
         "//deps/args/args",
         "@happly",
-        "@libglfw3",
+        "@glfw-3.3.9",
     ],
 )

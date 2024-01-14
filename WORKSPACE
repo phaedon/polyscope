@@ -1,47 +1,23 @@
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
-
-http_archive(
-    name = "com_google_googletest",
-    strip_prefix = "googletest-5ab508a01f9eb089207ee87fd547d290da39d015",
-    urls = ["https://github.com/google/googletest/archive/5ab508a01f9eb089207ee87fd547d290da39d015.zip"],
-)
-
-git_repository(
-    name = "imgui",
-    branch = "master",
-    remote = "https://github.com/phaedon/imgui.git",
-)
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 http_archive(
     name = "imgui-1.86",
     build_file_content = """
 cc_library(
-    name = "imgui-glfw",
+    name = "imgui-1.86",
     srcs = [
         "backends/imgui_impl_glfw.cpp",
         "backends/imgui_impl_opengl3.cpp",
-    ],
-    hdrs = [
-        "backends/imgui_impl_glfw.h",
-        "backends/imgui_impl_opengl3.h",
-        "backends/imgui_impl_opengl3_loader.h",
-        "imgui.h",
-        "imconfig.h",
-    ],
-    includes = ["."],
-    include_prefix = "imgui",
-)
-
-cc_library(
-    name = "imgui-1.86",
-    srcs = [
         "imgui.cpp",
         "imgui_draw.cpp",
         "imgui_tables.cpp",
         "imgui_widgets.cpp",
     ],
     hdrs = [
+        "backends/imgui_impl_glfw.h",
+        "backends/imgui_impl_opengl3.h",
+        "backends/imgui_impl_opengl3_loader.h",
         "imconfig.h",
         "imgui.h",
         "imgui_internal.h",
@@ -50,9 +26,11 @@ cc_library(
         "imstb_truetype.h",
     ],
     deps = [
-        ":imgui-glfw",
+        "@glfw-3.3.9",
     ],
+    linkopts = ["-ldl"],
     includes = ["."],
+    include_prefix = "imgui",
     visibility = ["//visibility:public"],
 )
 """,
@@ -75,35 +53,62 @@ cc_library(
     remote = "https://github.com/nmwsharp/happly.git",
 )
 
-git_repository(
-    name = "glm",
-    branch = "master",
+http_archive(
+    name = "glfw-3.3.9",
     build_file_content = """
 cc_library(
-    name = 'glm',
-    srcs = [],
+    name = "glfw-headers",
+    hdrs = [
+        "include/GLFW/glfw3.h",
+    ],
+    strip_include_prefix = "include",
     includes = ['.'],
-    hdrs = glob(['glm/**/*.hpp', 'glm/**/*.h', 'glm/**/*.inl']),
-    visibility = ['//visibility:public'],
+    visibility = [
+        "//visibility:private",
+    ],
 )
-""",
-    remote = "https://github.com/g-truc/glm.git",
-)
-
-# To get this to work on linux, you have to run:
-#     sudo apt install libglfw3-dev
-# TODO: replace with a proper rule using
-#     urls = ["https://github.com/glfw/glfw/archive/refs/tags/3.3.6.tar.gz"],
-new_local_repository(
-    name = "libglfw3",
-    build_file_content =
-        """
-cc_import(
-    name = "libglfw3",
-    hdrs = glob(["include/GLFW/*.h"]),
-    shared_library = "lib/x86_64-linux-gnu/libglfw.so",
+cc_library(
+    name = "glfw-3.3.9",
+    srcs = [
+        "src/context.c",
+        "src/egl_context.c",
+        "src/glx_context.c",
+        "src/init.c",
+        "src/input.c",
+        "src/linux_joystick.c",
+        "src/monitor.c",
+        "src/osmesa_context.c",
+        "src/posix_thread.c",
+        "src/posix_time.c",
+        "src/vulkan.c",
+        "src/window.c",
+        "src/x11_init.c",
+        "src/x11_monitor.c",
+        "src/x11_window.c",
+        "src/xkb_unicode.c",
+    ],
+    hdrs = [
+        "include/GLFW/glfw3native.h",
+        "src/egl_context.h",
+        "src/glx_context.h",
+        "src/internal.h",
+        "src/linux_joystick.h",
+        "src/mappings.h",
+        "src/osmesa_context.h",
+        "src/posix_thread.h",
+        "src/posix_time.h",
+        "src/x11_platform.h",
+        "src/xkb_unicode.h",
+    ],
+    deps = [
+        ":glfw-headers",
+    ],
+    defines = ["_GLFW_X11",],
+    linkopts = ["-lX11",],
     visibility = ["//visibility:public"],
 )
 """,
-    path = "/usr",
+    sha256 = "a7e7faef424fcb5f83d8faecf9d697a338da7f7a906fc1afbc0e1879ef31bd53",
+    strip_prefix = "glfw-3.3.9",
+    urls = ["https://github.com/glfw/glfw/archive/refs/tags/3.3.9.tar.gz"],
 )
