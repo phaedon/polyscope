@@ -17,6 +17,7 @@ cc_library(
     strip_include_prefix = "include",
     deps = [
         "//deps/MarchingCubeCpp:marching_cube",
+        "//deps/args/args",
         "//deps/glad",
         "//deps/stb",
         "@glm",
