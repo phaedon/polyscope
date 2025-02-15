@@ -22,6 +22,9 @@ cc_library(
         "//deps/stb",
         "@glm",
         "@imgui",
+        "@imgui//backends:platform-glfw",
+        "@imgui//backends:renderer-opengl3",
+        "@glfw",
         "@nlohmann_json//:json",
     ],
 )
