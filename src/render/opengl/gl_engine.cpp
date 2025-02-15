@@ -1,6 +1,5 @@
 // Copyright 2017-2023, Nicholas Sharp and the Polyscope contributors. https://polyscope.run
 
-#include "imgui/imgui_impl_opengl3.h"
 #include "polyscope/render/engine.h"
 
 #ifdef POLYSCOPE_BACKEND_OPENGL3_ENABLED
@@ -2132,111 +2131,6 @@ std::vector<unsigned char> GLEngine::readDisplayBuffer() {
   return buff;
 }
 
-
-void GLEngine::checkError(bool fatal) { checkGLError(fatal); }
-
-void GLEngine::makeContextCurrent() {
-  glfwMakeContextCurrent(mainWindow);
-  glfwSwapInterval(options::enableVSync ? 1 : 0);
-}
-
-void GLEngine::focusWindow() { glfwFocusWindow(mainWindow); }
-
-void GLEngine::showWindow() { glfwShowWindow(mainWindow); }
-
-void GLEngine::hideWindow() {
-  glfwHideWindow(mainWindow);
-  glfwPollEvents(); // this shouldn't be necessary, but seems to be needed at least on macOS. Perhaps realted to a
-                    // glfw bug? e.g. https://github.com/glfw/glfw/issues/1300 and related bugs
-}
-
-void GLEngine::updateWindowSize(bool force) {
-  int newBufferWidth, newBufferHeight, newWindowWidth, newWindowHeight;
-  glfwGetFramebufferSize(mainWindow, &newBufferWidth, &newBufferHeight);
-  glfwGetWindowSize(mainWindow, &newWindowWidth, &newWindowHeight);
-  if (force || newBufferWidth != view::bufferWidth || newBufferHeight != view::bufferHeight ||
-      newWindowHeight != view::windowHeight || newWindowWidth != view::windowWidth) {
-    // Basically a resize callback
-    requestRedraw();
-
-    // prevent any division by zero for e.g. aspect ratio calcs
-    if (newBufferHeight == 0) newBufferHeight = 1;
-    if (newWindowHeight == 0) newWindowHeight = 1;
-
-    view::bufferWidth = newBufferWidth;
-    view::bufferHeight = newBufferHeight;
-    view::windowWidth = newWindowWidth;
-    view::windowHeight = newWindowHeight;
-
-    render::engine->resizeScreenBuffers();
-    render::engine->setScreenBufferViewports();
-  }
-}
-
-
-void GLEngine::applyWindowSize() {
-  glfwSetWindowSize(mainWindow, view::windowWidth, view::windowHeight);
-
-  // on some platform size changes are asynchonous, need to ensure it completes
-  // we don't want to just retry until the resize has happened, because it could be impossible
-  // TODO it seems like on X11 sometimes even this isn't enough?
-  glfwWaitEvents();
-
-  updateWindowSize(true);
-}
-
-
-void GLEngine::setWindowResizable(bool newVal) {
-  glfwSetWindowAttrib(mainWindow, GLFW_RESIZABLE, newVal ? GLFW_TRUE : GLFW_FALSE);
-}
-
-bool GLEngine::getWindowResizable() { return glfwGetWindowAttrib(mainWindow, GLFW_RESIZABLE); }
-
-std::tuple<int, int> GLEngine::getWindowPos() {
-  int x, y;
-  glfwGetWindowPos(mainWindow, &x, &y);
-  return std::tuple<int, int>{x, y};
-}
-
-bool GLEngine::windowRequestsClose() {
-  bool shouldClose = glfwWindowShouldClose(mainWindow);
-  if (shouldClose) {
-    glfwSetWindowShouldClose(mainWindow, false); // un-set the state bit so we can close again
-    return true;
-  }
-  return false;
-}
-
-void GLEngine::pollEvents() { glfwPollEvents(); }
-
-bool GLEngine::isKeyPressed(char c) {
-  if (c >= '0' && c <= '9') return ImGui::IsKeyPressed(GLFW_KEY_0 + (c - '0'));
-  if (c >= 'a' && c <= 'z') return ImGui::IsKeyPressed(GLFW_KEY_A + (c - 'a'));
-  if (c >= 'A' && c <= 'Z') return ImGui::IsKeyPressed(GLFW_KEY_A + (c - 'A'));
-  exception("keyPressed only supports 0-9, a-z, A-Z");
-  return false;
-}
-
-int GLEngine::getKeyCode(char c) {
-  if (c >= '0' && c <= '9') return static_cast<int>(GLFW_KEY_0) + (c - '0');
-  if (c >= 'a' && c <= 'z') return static_cast<int>(GLFW_KEY_A) + (c - 'a');
-  if (c >= 'A' && c <= 'Z') return static_cast<int>(GLFW_KEY_A) + (c - 'A');
-  exception("getKeyCode only supports 0-9, a-z, A-Z");
-  return -1;
-}
-
-void GLEngine::ImGuiNewFrame() {
-  ImGui_ImplOpenGL3_NewFrame();
-  ImGui_ImplGlfw_NewFrame();
-  ImGui::NewFrame();
-
-  // ImGui::ShowDemoWindow();
-}
-
-void GLEngine::ImGuiRender() {
-  ImGui::Render();
-  ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-}
 
 void GLEngine::setDepthMode(DepthMode newMode) {
   switch (newMode) {
