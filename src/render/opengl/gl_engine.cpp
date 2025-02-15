@@ -1,9 +1,9 @@
 // Copyright 2017-2023, Nicholas Sharp and the Polyscope contributors. https://polyscope.run
 
-#include <imgui/backends/imgui_impl_opengl3.h>
+#include "backends/imgui_impl_opengl3.h"
 #include "polyscope/render/engine.h"
 
-#ifdef POLYSCOPE_BACKEND_OPENGL3_GLFW_ENABLED
+#ifdef POLYSCOPE_BACKEND_OPENGL3_ENABLED
 #include "polyscope/render/opengl/gl_engine.h"
 
 #include "polyscope/messages.h"
@@ -37,16 +37,7 @@
 namespace polyscope {
 namespace render {
 
-namespace backend_openGL3_glfw {
-
-GLEngine* glEngine = nullptr; // alias for global engine pointer
-
-void initializeRenderEngine() {
-  glEngine = new GLEngine();
-  engine = glEngine;
-  glEngine->initialize();
-  engine->allocateGlobalBuffersAndPrograms();
-}
+namespace backend_openGL3 {
 
 // == Map enums to native values
 
@@ -74,7 +65,7 @@ inline GLenum formatF(const TextureFormat& x) {
     case TextureFormat::RGB8:       return GL_RGB;
     case TextureFormat::RGBA8:      return GL_RGBA;
     case TextureFormat::RG16F:      return GL_RG;
-    case TextureFormat::RGB16F:     return GL_RGB; 
+    case TextureFormat::RGB16F:     return GL_RGB;
     case TextureFormat::RGBA16F:    return GL_RGBA;
     case TextureFormat::R32F:       return GL_RED;
     case TextureFormat::R16F:       return GL_RED;
@@ -117,7 +108,7 @@ inline GLenum native(const ShaderStageType& x) {
 inline GLenum native(const RenderBufferType& x) {
   switch (x) {
     case RenderBufferType::ColorAlpha:      return GL_RGBA;
-    case RenderBufferType::Color:           return GL_RGB; 
+    case RenderBufferType::Color:           return GL_RGB;
     case RenderBufferType::Depth:           return GL_DEPTH_COMPONENT;
     case RenderBufferType::Float4:          return GL_RGBA32F;
   }
@@ -169,11 +160,14 @@ void checkGLError(bool fatal = true) {
     case GL_INVALID_OPERATION:
       errText = "Invalid operation";
       break;
-    // case GL_STACK_OVERFLOW:    std::cerr << "Stack overflow"; break;
-    // case GL_STACK_UNDERFLOW:   std::cerr << "Stack underflow"; break;
+    case GL_INVALID_FRAMEBUFFER_OPERATION:
+      errText = "Invalid framebuffer operation";
+      break;
     case GL_OUT_OF_MEMORY:
       errText = "Out of memory";
       break;
+    // case GL_STACK_OVERFLOW:    std::cerr << "Stack overflow"; break;
+    // case GL_STACK_UNDERFLOW:   std::cerr << "Stack underflow"; break;
     default:
       errText = "Unknown error " + std::to_string(static_cast<unsigned int>(err));
     }
@@ -269,7 +263,7 @@ void GLAttributeBuffer::setData_helper(const std::vector<T>& data) {
 
   // do the actual copy
   dataSize = data.size();
-  glBufferSubData(getTarget(), 0, dataSize * sizeof(T), &data[0]);
+  glBufferSubData(getTarget(), 0, dataSize * sizeof(T), data.data());
 
   checkGLError();
 }
@@ -1350,7 +1344,7 @@ void GLShaderProgram::createBuffer(GLShaderAttribute& a) {
   if (a.location == -1) return;
 
   // generate the buffer if needed
-  std::shared_ptr<AttributeBuffer> newBuff = glEngine->generateAttributeBuffer(a.type, a.arrayCount);
+  std::shared_ptr<AttributeBuffer> newBuff = engine->generateAttributeBuffer(a.type, a.arrayCount);
   std::shared_ptr<GLAttributeBuffer> engineNewBuff = std::dynamic_pointer_cast<GLAttributeBuffer>(newBuff);
   if (!engineNewBuff) throw std::invalid_argument("buffer type cast failed");
   a.buff = engineNewBuff;
@@ -2114,101 +2108,9 @@ void GLShaderProgram::draw() {
 }
 
 GLEngine::GLEngine() {}
+GLEngine::~GLEngine() {}
 
-void GLEngine::initialize() {
-  // Small callback function for GLFW errors
-  auto error_print_callback = [](int error, const char* description) {
-    if (polyscope::options::verbosity > 0) {
-      std::cout << "GLFW emitted error: " << description << std::endl;
-    }
-  };
-
-  // === Initialize glfw
-  glfwSetErrorCallback(error_print_callback);
-  if (!glfwInit()) {
-    exception(options::printPrefix + "ERROR: Failed to initialize glfw");
-  }
-
-  // OpenGL version things
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-#if __APPLE__
-  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-#endif
-
-  // Create the window with context
-  glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-  glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_FALSE);
-  mainWindow = glfwCreateWindow(view::windowWidth, view::windowHeight, options::programName.c_str(), NULL, NULL);
-  glfwMakeContextCurrent(mainWindow);
-  glfwSetWindowPos(mainWindow, view::initWindowPosX, view::initWindowPosY);
-
-  // Set initial window size
-  int newBufferWidth, newBufferHeight, newWindowWidth, newWindowHeight;
-  glfwGetFramebufferSize(mainWindow, &newBufferWidth, &newBufferHeight);
-  glfwGetWindowSize(mainWindow, &newWindowWidth, &newWindowHeight);
-  view::bufferWidth = newBufferWidth;
-  view::bufferHeight = newBufferHeight;
-  view::windowWidth = newWindowWidth;
-  view::windowHeight = newWindowHeight;
-
-  setWindowResizable(view::windowResizable);
-
-// === Initialize openGL
-// Load openGL functions (using GLAD)
-#ifndef __APPLE__
-  if (!gladLoadGL()) {
-    exception(options::printPrefix + "ERROR: Failed to load openGL using GLAD");
-  }
-#endif
-  if (options::verbosity > 0) {
-    std::cout << options::printPrefix << "Backend: openGL3_glfw -- "
-              << "Loaded openGL version: " << glGetString(GL_VERSION) << std::endl;
-  }
-
-#ifdef __APPLE__
-  // Hack to classify the process as interactive
-  glfwPollEvents();
-#endif
-
-  { // Manually create the screen frame buffer
-    GLFrameBuffer* glScreenBuffer = new GLFrameBuffer(view::bufferWidth, view::bufferHeight, true);
-    displayBuffer.reset(glScreenBuffer);
-    glScreenBuffer->bind();
-    glClearColor(1., 1., 1., 0.);
-    // glClearColor(0., 0., 0., 0.);
-    // glClearDepth(1.);
-  }
-
-  populateDefaultShadersAndRules();
-}
-
-
-void GLEngine::initializeImGui() {
-  bindDisplay();
-
-  ImGui::CreateContext(); // must call once at start
-
-  // Set up ImGUI glfw bindings
-  ImGui_ImplGlfw_InitForOpenGL(mainWindow, true);
-  const char* glsl_version = "#version 150";
-  ImGui_ImplOpenGL3_Init(glsl_version);
-
-  configureImGui();
-}
-
-void GLEngine::shutdownImGui() {
-  // ImGui shutdown things
-  ImGui_ImplOpenGL3_Shutdown();
-  ImGui_ImplGlfw_Shutdown();
-  ImGui::DestroyContext();
-}
-
-void GLEngine::swapDisplayBuffers() {
-  bindDisplay();
-  glfwSwapBuffers(mainWindow);
-}
+void GLEngine::checkError(bool fatal) { checkGLError(fatal); }
 
 std::vector<unsigned char> GLEngine::readDisplayBuffer() {
   // TODO do we need to bind here?
@@ -2308,9 +2210,9 @@ bool GLEngine::windowRequestsClose() {
 void GLEngine::pollEvents() { glfwPollEvents(); }
 
 bool GLEngine::isKeyPressed(char c) {
-  if (c >= '0' && c <= '9') return ImGui::IsKeyPressed(static_cast<ImGuiKey>(GLFW_KEY_0 + (c - '0')));
-  if (c >= 'a' && c <= 'z') return ImGui::IsKeyPressed(static_cast<ImGuiKey>(GLFW_KEY_A + (c - 'a')));
-  if (c >= 'A' && c <= 'Z') return ImGui::IsKeyPressed(static_cast<ImGuiKey>(GLFW_KEY_A + (c - 'A')));
+  if (c >= '0' && c <= '9') return ImGui::IsKeyPressed(GLFW_KEY_0 + (c - '0'));
+  if (c >= 'a' && c <= 'z') return ImGui::IsKeyPressed(GLFW_KEY_A + (c - 'a'));
+  if (c >= 'A' && c <= 'Z') return ImGui::IsKeyPressed(GLFW_KEY_A + (c - 'A'));
   exception("keyPressed only supports 0-9, a-z, A-Z");
   return false;
 }
@@ -2417,13 +2319,6 @@ void GLEngine::setBackfaceCull(bool newVal) {
     glDisable(GL_CULL_FACE);
   }
 }
-
-std::string GLEngine::getClipboardText() {
-  std::string clipboardData = ImGui::GetClipboardText();
-  return clipboardData;
-}
-
-void GLEngine::setClipboardText(std::string text) { ImGui::SetClipboardText(text.c_str()); }
 
 void GLEngine::applyTransparencySettings() {
   // Remove any old transparency-related rules
@@ -2670,6 +2565,7 @@ void GLEngine::populateDefaultShadersAndRules() {
   registerShaderProgram("RAYCAST_TANGENT_VECTOR", {FLEX_TANGENT_VECTOR_VERT_SHADER, FLEX_VECTOR_GEOM_SHADER, FLEX_VECTOR_FRAG_SHADER}, DrawMode::Points);
   registerShaderProgram("RAYCAST_CYLINDER", {FLEX_CYLINDER_VERT_SHADER, FLEX_CYLINDER_GEOM_SHADER, FLEX_CYLINDER_FRAG_SHADER}, DrawMode::Points);
   registerShaderProgram("HISTOGRAM", {HISTOGRAM_VERT_SHADER, HISTOGRAM_FRAG_SHADER}, DrawMode::Triangles);
+  registerShaderProgram("HISTOGRAM_CATEGORICAL", {HISTOGRAM_VERT_SHADER, HISTOGRAM_CATEGORICAL_FRAG_SHADER}, DrawMode::Triangles);
   registerShaderProgram("GROUND_PLANE_TILE", {GROUND_PLANE_VERT_SHADER, GROUND_PLANE_TILE_FRAG_SHADER}, DrawMode::Triangles);
   registerShaderProgram("GROUND_PLANE_TILE_REFLECT", {GROUND_PLANE_VERT_SHADER, GROUND_PLANE_TILE_REFLECT_FRAG_SHADER}, DrawMode::Triangles);
   registerShaderProgram("GROUND_PLANE_SHADOW", {GROUND_PLANE_VERT_SHADER, GROUND_PLANE_SHADOW_FRAG_SHADER}, DrawMode::Triangles);
@@ -2699,12 +2595,12 @@ void GLEngine::populateDefaultShadersAndRules() {
   registerShaderRule("DOWNSAMPLE_RESOLVE_2", DOWNSAMPLE_RESOLVE_2);
   registerShaderRule("DOWNSAMPLE_RESOLVE_3", DOWNSAMPLE_RESOLVE_3);
   registerShaderRule("DOWNSAMPLE_RESOLVE_4", DOWNSAMPLE_RESOLVE_4);
-  
+
   registerShaderRule("TRANSPARENCY_STRUCTURE", TRANSPARENCY_STRUCTURE);
   registerShaderRule("TRANSPARENCY_RESOLVE_SIMPLE", TRANSPARENCY_RESOLVE_SIMPLE);
   registerShaderRule("TRANSPARENCY_PEEL_STRUCTURE", TRANSPARENCY_PEEL_STRUCTURE);
   registerShaderRule("TRANSPARENCY_PEEL_GROUND", TRANSPARENCY_PEEL_GROUND);
-  
+
   registerShaderRule("GENERATE_VIEW_POS", GENERATE_VIEW_POS);
   registerShaderRule("COMPUTE_SHADE_NORMAL_FROM_POSITION", COMPUTE_SHADE_NORMAL_FROM_POSITION);
   registerShaderRule("PREMULTIPLY_LIT_COLOR", PREMULTIPLY_LIT_COLOR);
@@ -2716,6 +2612,7 @@ void GLEngine::populateDefaultShadersAndRules() {
   registerShaderRule("LIGHT_PASSTHRU", LIGHT_PASSTHRU);
   registerShaderRule("SHADE_BASECOLOR", SHADE_BASECOLOR);
   registerShaderRule("SHADE_COLOR", SHADE_COLOR);
+  registerShaderRule("SHADE_CATEGORICAL_COLORMAP", SHADE_CATEGORICAL_COLORMAP);
   registerShaderRule("SHADECOLOR_FROM_UNIFORM", SHADECOLOR_FROM_UNIFORM);
   registerShaderRule("SHADE_COLORMAP_VALUE", SHADE_COLORMAP_VALUE);
   registerShaderRule("SHADE_COLORMAP_ANGULAR2", SHADE_COLORMAP_ANGULAR2);
@@ -2724,9 +2621,10 @@ void GLEngine::populateDefaultShadersAndRules() {
   registerShaderRule("SHADE_CHECKER_CATEGORY", SHADE_CHECKER_CATEGORY);
   registerShaderRule("SHADEVALUE_MAG_VALUE2", SHADEVALUE_MAG_VALUE2);
   registerShaderRule("ISOLINE_STRIPE_VALUECOLOR", ISOLINE_STRIPE_VALUECOLOR);
+  registerShaderRule("CONTOUR_VALUECOLOR", CONTOUR_VALUECOLOR);
   registerShaderRule("CHECKER_VALUE2COLOR", CHECKER_VALUE2COLOR);
   registerShaderRule("INVERSE_TONEMAP", INVERSE_TONEMAP);
- 
+
   // Texture and image things
   registerShaderRule("TEXTURE_ORIGIN_UPPERLEFT", TEXTURE_ORIGIN_UPPERLEFT);
   registerShaderRule("TEXTURE_ORIGIN_LOWERLEFT", TEXTURE_ORIGIN_LOWERLEFT);
@@ -2749,7 +2647,9 @@ void GLEngine::populateDefaultShadersAndRules() {
   registerShaderRule("MESH_BACKFACE_DIFFERENT", MESH_BACKFACE_DIFFERENT);
   registerShaderRule("MESH_BACKFACE_DARKEN", MESH_BACKFACE_DARKEN);
   registerShaderRule("MESH_PROPAGATE_VALUE", MESH_PROPAGATE_VALUE);
+  registerShaderRule("MESH_PROPAGATE_VALUEALPHA", MESH_PROPAGATE_VALUEALPHA);
   registerShaderRule("MESH_PROPAGATE_FLAT_VALUE", MESH_PROPAGATE_FLAT_VALUE);
+  registerShaderRule("MESH_PROPAGATE_VALUE_CORNER_NEAREST", MESH_PROPAGATE_VALUE_CORNER_NEAREST);
   registerShaderRule("MESH_PROPAGATE_VALUE2", MESH_PROPAGATE_VALUE2);
   registerShaderRule("MESH_PROPAGATE_TCOORD", MESH_PROPAGATE_TCOORD);
   registerShaderRule("MESH_PROPAGATE_COLOR", MESH_PROPAGATE_COLOR);
@@ -2768,6 +2668,7 @@ void GLEngine::populateDefaultShadersAndRules() {
 
   // sphere things
   registerShaderRule("SPHERE_PROPAGATE_VALUE", SPHERE_PROPAGATE_VALUE);
+  registerShaderRule("SPHERE_PROPAGATE_VALUEALPHA", SPHERE_PROPAGATE_VALUEALPHA);
   registerShaderRule("SPHERE_PROPAGATE_VALUE2", SPHERE_PROPAGATE_VALUE2);
   registerShaderRule("SPHERE_PROPAGATE_COLOR", SPHERE_PROPAGATE_COLOR);
   registerShaderRule("SPHERE_CULLPOS_FROM_CENTER", SPHERE_CULLPOS_FROM_CENTER);
@@ -2782,6 +2683,7 @@ void GLEngine::populateDefaultShadersAndRules() {
   // cylinder things
   registerShaderRule("CYLINDER_PROPAGATE_VALUE", CYLINDER_PROPAGATE_VALUE);
   registerShaderRule("CYLINDER_PROPAGATE_BLEND_VALUE", CYLINDER_PROPAGATE_BLEND_VALUE);
+  registerShaderRule("CYLINDER_PROPAGATE_NEAREST_VALUE", CYLINDER_PROPAGATE_NEAREST_VALUE);
   registerShaderRule("CYLINDER_PROPAGATE_COLOR", CYLINDER_PROPAGATE_COLOR);
   registerShaderRule("CYLINDER_PROPAGATE_BLEND_COLOR", CYLINDER_PROPAGATE_BLEND_COLOR);
   registerShaderRule("CYLINDER_PROPAGATE_PICK", CYLINDER_PROPAGATE_PICK);
@@ -2805,22 +2707,8 @@ void GLEngine::createSlicePlaneFliterRule(std::string uniquePostfix) {
 }
 
 
-} // namespace backend_openGL3_glfw
+} // namespace backend_openGL3
 } // namespace render
 } // namespace polyscope
 
-#else
-
-#include <stdexcept>
-
-#include "polyscope/messages.h"
-
-namespace polyscope {
-namespace render {
-namespace backend_openGL3_glfw {
-void initializeRenderEngine() { exception("Polyscope was not compiled with support for backend: openGL3_glfw"); }
-} // namespace backend_openGL3_glfw
-} // namespace render
-} // namespace polyscope
-
-#endif
+#endif // POLYSCOPE_BACKEND_OPENGL_ENABLED

@@ -8,7 +8,7 @@
 
 namespace polyscope {
 namespace render{
-namespace backend_openGL3_glfw {
+namespace backend_openGL3 {
 
 const ShaderStageSpecification MAP_LIGHT_FRAG_SHADER = {
     
@@ -238,7 +238,7 @@ const ShaderReplacementRule TRANSPARENCY_STRUCTURE (
           uniform float u_transparency;
         )"},
       {"GENERATE_ALPHA", R"(
-          alphaOut = u_transparency;
+          alphaOut *= u_transparency;
         )"},
     },
     /* uniforms */ {
@@ -257,7 +257,7 @@ const ShaderReplacementRule TRANSPARENCY_PEEL_STRUCTURE (
           uniform vec2 u_viewportDim;
         )"},
       {"GENERATE_ALPHA", R"(
-          alphaOut = u_transparency;
+          alphaOut *= u_transparency;
         )"},
       {"GLOBAL_FRAGMENT_FILTER", R"(
           // assumption: "float depth" must be already set 
@@ -304,6 +304,6 @@ const ShaderReplacementRule TRANSPARENCY_PEEL_GROUND (
 
 // clang-format on
 
-} // namespace backend_openGL3_glfw
+} // namespace backend_openGL3
 } // namespace render
 } // namespace polyscope

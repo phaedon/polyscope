@@ -37,6 +37,12 @@ void removeLastSceneSlicePlane() {
   }
 }
 
+void removeAllSlicePlanes() {
+  while(!state::slicePlanes.empty()) {
+    removeLastSceneSlicePlane();
+  }
+}
+
 void buildSlicePlaneGUI() {
 
 
@@ -158,10 +164,10 @@ void SlicePlane::createVolumeSliceProgram() {
   VolumeMesh* meshToInspect = polyscope::getVolumeMesh(inspectedMeshName);
 
   // clang-format off
-  volumeInspectProgram = render::engine->requestShader( "SLICE_TETS", 
+  volumeInspectProgram = render::engine->requestShader( "SLICE_TETS",
       render::engine->addMaterialRules(meshToInspect->getMaterial(),
         meshToInspect->addVolumeMeshRules(
-          {"SLICE_TETS_BASECOLOR_SHADE"}, 
+          {"SLICE_TETS_BASECOLOR_SHADE"},
         true, true)
       )
     );

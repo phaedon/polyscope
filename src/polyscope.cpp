@@ -38,6 +38,7 @@ struct ContextEntry {
   bool drawDefaultUI;
 };
 std::vector<ContextEntry> contextStack;
+int frameTickStack = 0;
 
 bool redrawNextFrame = true;
 bool unshowRequested = false;
@@ -65,11 +66,11 @@ void readPrefsFile() {
 
       // Set values
       // Do some basic validation on the sizes first to work around bugs with bogus values getting written to init file
-      if (prefsJSON.count("windowWidth") > 0) {
+      if (view::windowWidth == -1 && prefsJSON.count("windowWidth") > 0) { // only load if not already set
         int val = prefsJSON["windowWidth"];
         if (val >= 64 && val < 10000) view::windowWidth = val;
       }
-      if (prefsJSON.count("windowHeight") > 0) {
+      if (view::windowHeight == -1 && prefsJSON.count("windowHeight") > 0) { // only load if not already set
         int val = prefsJSON["windowHeight"];
         if (val >= 64 && val < 10000) view::windowHeight = val;
       }
@@ -142,11 +143,15 @@ void init(std::string backend) {
     return;
   }
 
+  info(5, "Initializing Polyscope");
+
   state::backend = backend;
 
   if (options::usePrefsFile) {
     readPrefsFile();
   }
+  if (view::windowWidth == -1) view::windowWidth = view::defaultWindowWidth;
+  if (view::windowHeight == -1) view::windowHeight = view::defaultWindowHeight;
 
   // Initialize the rendering engine
   render::initializeRenderEngine(backend);
@@ -177,17 +182,22 @@ void pushContext(std::function<void()> callbackFunction, bool drawDefaultUI) {
 
   // Create a new context and push it on to the stack
   ImGuiContext* newContext = ImGui::CreateContext(render::engine->getImGuiGlobalFontAtlas());
-  ImGuiIO& oldIO = ImGui::GetIO(); // used to copy below, see note
+  ImGuiIO& oldIO = ImGui::GetIO(); // used to GLFW + OpenGL data to the new IO object
+#ifdef IMGUI_HAS_DOCK
+  ImGuiPlatformIO& oldPlatformIO = ImGui::GetPlatformIO();
+#endif
   ImGui::SetCurrentContext(newContext);
+#ifdef IMGUI_HAS_DOCK
+  // Propagate GLFW window handle to new context
+  ImGui::GetMainViewport()->PlatformHandle = oldPlatformIO.Viewports[0]->PlatformHandle;
+#endif
+  ImGui::GetIO().BackendPlatformUserData = oldIO.BackendPlatformUserData;
+  ImGui::GetIO().BackendRendererUserData = oldIO.BackendRendererUserData;
 
   if (options::configureImGuiStyleCallback) {
     options::configureImGuiStyleCallback();
   }
 
-  ImGui::GetIO() = oldIO; // Copy all of the old IO values to new. With ImGUI 1.76 (and some previous versions), this
-                          // was necessary to fix a bug where keys like delete, etc would break in subcontexts. The
-                          // problem was that the key mappings (e.g. GLFW_KEY_BACKSPACE --> ImGuiKey_Backspace) need to
-                          // be populated in io.KeyMap, and these entries would get lost on creating a new context.
   contextStack.push_back(ContextEntry{newContext, callbackFunction, drawDefaultUI});
 
   if (contextStack.size() > 50) {
@@ -224,8 +234,11 @@ void pushContext(std::function<void()> callbackFunction, bool drawDefaultUI) {
     }
   }
 
-  oldIO = ImGui::GetIO(); // Copy new IO values to old. I haven't encountered anything that strictly requires this, but
-                          // it feels like we should mirror the behavior from pushing.
+  // Workaround overzealous ImGui assertion before destroying any inner context
+  // https://github.com/ocornut/imgui/pull/7175
+  ImGui::SetCurrentContext(newContext);
+  ImGui::GetIO().BackendPlatformUserData = nullptr;
+  ImGui::GetIO().BackendRendererUserData = nullptr;
 
   ImGui::DestroyContext(newContext);
 
@@ -248,11 +261,24 @@ ImGuiContext* getCurrentContext() { return contextStack.empty() ? nullptr : cont
 
 void frameTick() {
 
-  // Make sure we're initialized
+  // Do some sanity-checking around control flow and use of frameTick() / show()
+  if (contextStack.size() > 1) {
+    exception("Do not call frameTick() while show() is already looping the main loop.");
+  }
+  if (frameTickStack > 0) {
+    exception("You called frameTick() while a previous call was in the midst of executing. Do not re-enter frameTick() "
+              "or call it recursively.");
+  }
+  frameTickStack++;
+
+  // Make sure we're initialized and visible
   checkInitialized();
   render::engine->showWindow();
 
+  // All-imporant main loop iteration
   mainLoopIteration();
+
+  frameTickStack--;
 }
 
 void requestRedraw() { redrawNextFrame = true; }
@@ -297,18 +323,20 @@ void processInputEvents() {
   }
 
   bool widgetCapturedMouse = false;
-  for (WeakHandle<Widget> wHandle : state::widgets) {
-    if (wHandle.isValid()) {
-      Widget& w = wHandle.get();
-      widgetCapturedMouse = w.interact();
-      if (widgetCapturedMouse) {
-        break;
-      }
-    }
-  }
 
   // Handle scroll events for 3D view
   if (state::doDefaultMouseInteraction) {
+
+    for (WeakHandle<Widget> wHandle : state::widgets) {
+      if (wHandle.isValid()) {
+        Widget& w = wHandle.get();
+        widgetCapturedMouse = w.interact();
+        if (widgetCapturedMouse) {
+          break;
+        }
+      }
+    }
+
     if (!io.WantCaptureMouse && !widgetCapturedMouse) {
       double xoffset = io.MouseWheelH;
       double yoffset = io.MouseWheel;
@@ -376,8 +404,7 @@ void processInputEvents() {
         // Don't pick at the end of a long drag
         if (dragDistSinceLastRelease < dragIgnoreThreshold) {
           ImVec2 p = ImGui::GetMousePos();
-          std::pair<Structure*, size_t> pickResult =
-              pick::evaluatePickQuery(io.DisplayFramebufferScale.x * p.x, io.DisplayFramebufferScale.y * p.y);
+          std::pair<Structure*, size_t> pickResult = pick::pickAtScreenCoords(glm::vec2{p.x, p.y});
           pick::setSelection(pickResult);
         }
 
@@ -585,18 +612,18 @@ void buildPolyscopeGui() {
 
     // clang-format off
 		ImGui::Begin("Controls", NULL, ImGuiWindowFlags_NoTitleBar);
-		ImGui::TextUnformatted("View Navigation:");			
+		ImGui::TextUnformatted("View Navigation:");
 			ImGui::TextUnformatted("      Rotate: [left click drag]");
 			ImGui::TextUnformatted("   Translate: [shift] + [left click drag] OR [right click drag]");
 			ImGui::TextUnformatted("        Zoom: [scroll] OR [ctrl] + [shift] + [left click drag]");
 			ImGui::TextUnformatted("   Use [ctrl-c] and [ctrl-v] to save and restore camera poses");
 			ImGui::TextUnformatted("     via the clipboard.");
-		ImGui::TextUnformatted("\nMenu Navigation:");			
+		ImGui::TextUnformatted("\nMenu Navigation:");
 			ImGui::TextUnformatted("   Menu headers with a '>' can be clicked to collapse and expand.");
 			ImGui::TextUnformatted("   Use [ctrl] + [left click] to manually enter any numeric value");
 			ImGui::TextUnformatted("     via the keyboard.");
 			ImGui::TextUnformatted("   Press [space] to dismiss popup dialogs.");
-		ImGui::TextUnformatted("\nSelection:");			
+		ImGui::TextUnformatted("\nSelection:");
 			ImGui::TextUnformatted("   Select elements of a structure with [left click]. Data from");
 			ImGui::TextUnformatted("     that element will be shown on the right. Use [right click]");
 			ImGui::TextUnformatted("     to clear the selection.");
@@ -611,7 +638,7 @@ void buildPolyscopeGui() {
   render::engine->buildEngineGui();
 
   // Render options tree
-  ImGui::SetNextTreeNodeOpen(false, ImGuiCond_FirstUseEver);
+  ImGui::SetNextItemOpen(false, ImGuiCond_FirstUseEver);
   if (ImGui::TreeNode("Render")) {
 
     // fps
@@ -632,7 +659,7 @@ void buildPolyscopeGui() {
     ImGui::TreePop();
   }
 
-  ImGui::SetNextTreeNodeOpen(false, ImGuiCond_FirstUseEver);
+  ImGui::SetNextItemOpen(false, ImGuiCond_FirstUseEver);
   if (ImGui::TreeNode("Debug")) {
 
     if (ImGui::Button("Force refresh")) {
@@ -702,8 +729,8 @@ void buildStructureGui() {
 
       int32_t skipCount = 0;
       for (auto& x : structureMap) {
-        ImGui::SetNextTreeNodeOpen(structureMap.size() <= 8,
-                                   ImGuiCond_FirstUseEver); // closed by default if more than 8
+        ImGui::SetNextItemOpen(structureMap.size() <= 8,
+                               ImGuiCond_FirstUseEver); // closed by default if more than 8
 
         if (structuresToSkip.find(x.second.get()) != structuresToSkip.end()) {
           skipCount++;
@@ -747,8 +774,7 @@ void buildPickGui() {
 
 void buildUserGuiAndInvokeCallback() {
 
-  if (!options::invokeUserCallbackForNestedShow && contextStack.size() > 2) {
-    // NOTE: this may have funky interactions with manually calling frameTick()
+  if (!options::invokeUserCallbackForNestedShow && (contextStack.size() + frameTickStack) > 2) {
     return;
   }
 
@@ -785,6 +811,10 @@ void draw(bool withUI, bool withContextCallback) {
 
   if (withUI) {
     render::engine->ImGuiNewFrame();
+
+    processInputEvents();
+    view::updateFlight();
+    showDelayedWarnings();
   }
 
   // Build the GUI components
@@ -855,9 +885,6 @@ void mainLoopIteration() {
 
   // Process UI events
   render::engine->pollEvents();
-  processInputEvents();
-  view::updateFlight();
-  showDelayedWarnings();
 
   // Housekeeping
   purgeWidgets();
@@ -872,6 +899,14 @@ void show(size_t forFrames) {
   if (!state::initialized) {
     exception("must initialize Polyscope with polyscope::init() before calling polyscope::show().");
   }
+
+  if (isHeadless() && forFrames == 0) {
+    info("You called show() while in headless mode. In headless mode there is no display to create windows on. By "
+         "default, the show() call will block indefinitely. If you did not mean to run in headless mode, check the "
+         "initialization settings. Otherwise, be sure to set a callback to make something happen while polyscope is "
+         "showing the UI, or use functions like screenshot() to render directly without calling show().");
+  }
+
   unshowRequested = false;
 
   // the popContext() doesn't quit until _after_ the last frame, so we need to decrement by 1 to get the count right
@@ -905,14 +940,49 @@ void show(size_t forFrames) {
 
 void unshow() { unshowRequested = true; }
 
-void shutdown() {
+bool windowRequestsClose() {
+  if (render::engine && render::engine->windowRequestsClose()) {
+    return true;
+  }
 
-  // TODO should we make an effort to destruct everything here?
+  return false;
+}
+
+bool isHeadless() {
+  if (!isInitialized()) {
+    exception("must initialize Polyscope with init() before calling isHeadless().");
+  }
+  if (render::engine) {
+    return render::engine->isHeadless();
+  }
+  return false;
+}
+
+void shutdown(bool allowMidFrameShutdown) {
+
+  if (!allowMidFrameShutdown && contextStack.size() > 1) {
+    terminatingError("shutdown() was called mid-frame (e.g. in a per-frame callback, or UI element). This is not "
+                     "permitted, shutdown() may only be called when the main loop is not executing.");
+  }
+
   if (options::usePrefsFile) {
     writePrefsFile();
   }
 
-  render::engine->shutdownImGui();
+  // Clear out all structures and other scene objects
+  removeAllStructures();
+  removeAllGroups();
+  removeAllSlicePlanes();
+  clearMessages();
+  state::userCallback = nullptr;
+
+  // Shut down the render engine
+  render::engine->shutdown();
+  delete render::engine;
+  contextStack.clear();
+  render::engine = nullptr;
+  state::backend = "";
+  state::initialized = false;
 }
 
 bool registerStructure(Structure* s, bool replaceIfPresent) {

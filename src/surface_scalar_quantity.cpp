@@ -41,6 +41,7 @@ void SurfaceScalarQuantity::buildCustomUI() {
   if (ImGui::BeginPopup("OptionsPopup")) {
 
     buildScalarOptionsUI();
+    buildSurfaceScalarOptionsUI();
 
     ImGui::EndPopup();
   }
@@ -65,30 +66,56 @@ SurfaceVertexScalarQuantity::SurfaceVertexScalarQuantity(std::string name, const
 
 {
   values.ensureHostBufferPopulated();
-  hist.buildHistogram(values.data);
+  hist.buildHistogram(values.data, dataType);
 }
 
 void SurfaceVertexScalarQuantity::createProgram() {
   // Create the program to draw this quantity
 
-  // clang-format off
-  program = render::engine->requestShader("MESH",
-      render::engine->addMaterialRules(parent.getMaterial(),
-        parent.addSurfaceMeshRules(
-          addScalarRules(
-            {"MESH_PROPAGATE_VALUE"}
+  if (dataType == DataType::CATEGORICAL) {
+    // special case: nearst-vertex interpolation for categorical data
+    // (plus some special-case handling for cases where two vertices have the same value)
+
+    // clang-format off
+    program = render::engine->requestShader("MESH",
+        render::engine->addMaterialRules(parent.getMaterial(),
+          parent.addSurfaceMeshRules(
+            addScalarRules(
+              {"MESH_PROPAGATE_VALUE_CORNER_NEAREST"}
+            )
           )
         )
-      )
-    );
-  // clang-format on
+      );
+    // clang-format on
 
-  program->setAttribute("a_value", values.getIndexedRenderAttributeBuffer(parent.triangleVertexInds));
+    program->setAttribute("a_value3", values.getIndexedRenderAttributeBuffer(parent.triangleAllVertexInds));
+
+  } else {
+    // common case: linear interpolation within each triangle
+
+    // clang-format off
+    program = render::engine->requestShader("MESH",
+        render::engine->addMaterialRules(parent.getMaterial(),
+          parent.addSurfaceMeshRules(
+            addScalarRules(
+              {"MESH_PROPAGATE_VALUE"}
+            )
+          )
+        )
+      );
+    // clang-format on
+
+    program->setAttribute("a_value", values.getIndexedRenderAttributeBuffer(parent.triangleVertexInds));
+  }
+
   parent.setMeshGeometryAttributes(*program);
   render::engine->setMaterial(*program, parent.getMaterial());
   program->setTextureFromColormap("t_colormap", cMap.get());
 }
 
+std::shared_ptr<render::AttributeBuffer> SurfaceVertexScalarQuantity::getAttributeBuffer() {
+  return values.getIndexedRenderAttributeBuffer(parent.triangleVertexInds);
+}
 
 void SurfaceVertexScalarQuantity::buildVertexInfoGUI(size_t vInd) {
   ImGui::TextUnformatted(name.c_str());
@@ -108,7 +135,7 @@ SurfaceFaceScalarQuantity::SurfaceFaceScalarQuantity(std::string name, const std
 {
   values.ensureHostBufferPopulated();
   parent.faceAreas.ensureHostBufferPopulated();
-  hist.buildHistogram(values.data);
+  hist.buildHistogram(values.data, dataType);
 }
 
 void SurfaceFaceScalarQuantity::createProgram() {
@@ -133,6 +160,10 @@ void SurfaceFaceScalarQuantity::createProgram() {
 }
 
 
+std::shared_ptr<render::AttributeBuffer> SurfaceFaceScalarQuantity::getAttributeBuffer() {
+  return values.getIndexedRenderAttributeBuffer(parent.triangleFaceInds);
+}
+
 void SurfaceFaceScalarQuantity::buildFaceInfoGUI(size_t fInd) {
   ImGui::TextUnformatted(name.c_str());
   ImGui::NextColumn();
@@ -153,7 +184,7 @@ SurfaceEdgeScalarQuantity::SurfaceEdgeScalarQuantity(std::string name, const std
 
 {
   values.ensureHostBufferPopulated();
-  hist.buildHistogram(values.data);
+  hist.buildHistogram(values.data, dataType);
 }
 
 void SurfaceEdgeScalarQuantity::createProgram() {
@@ -177,6 +208,9 @@ void SurfaceEdgeScalarQuantity::createProgram() {
   program->setTextureFromColormap("t_colormap", cMap.get());
 }
 
+std::shared_ptr<render::AttributeBuffer> SurfaceEdgeScalarQuantity::getAttributeBuffer() {
+  return values.getIndexedRenderAttributeBuffer(parent.triangleAllEdgeInds);
+}
 
 void SurfaceEdgeScalarQuantity::buildEdgeInfoGUI(size_t eInd) {
   ImGui::TextUnformatted(name.c_str());
@@ -195,7 +229,7 @@ SurfaceHalfedgeScalarQuantity::SurfaceHalfedgeScalarQuantity(std::string name, c
 
 {
   values.ensureHostBufferPopulated();
-  hist.buildHistogram(values.data);
+  hist.buildHistogram(values.data, dataType);
 }
 
 void SurfaceHalfedgeScalarQuantity::createProgram() {
@@ -219,6 +253,10 @@ void SurfaceHalfedgeScalarQuantity::createProgram() {
   program->setTextureFromColormap("t_colormap", cMap.get());
 }
 
+std::shared_ptr<render::AttributeBuffer> SurfaceHalfedgeScalarQuantity::getAttributeBuffer() {
+  return values.getIndexedRenderAttributeBuffer(parent.triangleAllHalfedgeInds);
+}
+
 void SurfaceHalfedgeScalarQuantity::buildHalfedgeInfoGUI(size_t heInd) {
   ImGui::TextUnformatted(name.c_str());
   ImGui::NextColumn();
@@ -236,13 +274,33 @@ SurfaceCornerScalarQuantity::SurfaceCornerScalarQuantity(std::string name, const
 
 {
   values.ensureHostBufferPopulated();
-  hist.buildHistogram(values.data);
+  hist.buildHistogram(values.data, dataType);
 }
 
 void SurfaceCornerScalarQuantity::createProgram() {
   // Create the program to draw this quantity
 
-  // clang-format off
+  if (dataType == DataType::CATEGORICAL) {
+    // special case: nearst-vertex interpolation for categorical data
+    // (plus some special-case handling for cases where two vertices have the same value)
+
+    // clang-format off
+    program = render::engine->requestShader("MESH",
+        render::engine->addMaterialRules(parent.getMaterial(),
+          parent.addSurfaceMeshRules(
+            addScalarRules(
+              {"MESH_PROPAGATE_VALUE_CORNER_NEAREST"}
+            )
+          )
+        )
+      );
+    // clang-format on
+
+    program->setAttribute("a_value3", values.getIndexedRenderAttributeBuffer(parent.triangleAllCornerInds));
+
+  } else {
+
+    // clang-format off
   program = render::engine->requestShader("MESH",
       render::engine->addMaterialRules(parent.getMaterial(),
         parent.addSurfaceMeshRules(
@@ -252,12 +310,18 @@ void SurfaceCornerScalarQuantity::createProgram() {
         )
       )
     );
-  // clang-format on
+    // clang-format on
 
-  program->setAttribute("a_value", values.getIndexedRenderAttributeBuffer(parent.triangleCornerInds));
+    program->setAttribute("a_value", values.getIndexedRenderAttributeBuffer(parent.triangleCornerInds));
+  }
+
   parent.setMeshGeometryAttributes(*program);
   render::engine->setMaterial(*program, parent.getMaterial());
   program->setTextureFromColormap("t_colormap", cMap.get());
+}
+
+std::shared_ptr<render::AttributeBuffer> SurfaceCornerScalarQuantity::getAttributeBuffer() {
+  return values.getIndexedRenderAttributeBuffer(parent.triangleCornerInds);
 }
 
 void SurfaceCornerScalarQuantity::buildCornerInfoGUI(size_t cInd) {
@@ -275,11 +339,16 @@ SurfaceTextureScalarQuantity::SurfaceTextureScalarQuantity(std::string name, Sur
                                                            SurfaceParameterizationQuantity& param_, size_t dimX_,
                                                            size_t dimY_, const std::vector<float>& values_,
                                                            ImageOrigin origin_, DataType dataType_)
-    : SurfaceScalarQuantity(name, mesh_, "vertex", values_, dataType_), param(param_), dimX(dimX_), dimY(dimY_),
-      imageOrigin(origin_) {
+    : SurfaceScalarQuantity(name, mesh_, "vertex", values_, dataType_),
+      TextureMapQuantity(*this, dimX_, dimY_, origin_), param(param_) {
   values.setTextureSize(dimX, dimY);
   values.ensureHostBufferPopulated();
-  hist.buildHistogram(values.data);
+  hist.buildHistogram(values.data, dataType);
+
+  if (dataType == DataType::CATEGORICAL) {
+    // default to nearest filtering for categorical data, it's probably what the user wants
+    filterMode.setPassive(FilterMode::Nearest);
+  }
 }
 
 void SurfaceTextureScalarQuantity::createProgram() {
@@ -316,8 +385,14 @@ void SurfaceTextureScalarQuantity::createProgram() {
   render::engine->setMaterial(*program, parent.getMaterial());
   program->setTextureFromColormap("t_colormap", cMap.get());
 
-  values.getRenderTextureBuffer()->setFilterMode(FilterMode::Linear);
+  values.getRenderTextureBuffer()->setFilterMode(filterMode.get());
 }
 
+void SurfaceTextureScalarQuantity::buildSurfaceScalarOptionsUI() { buildTextureMapOptionsUI(); }
+
+std::shared_ptr<render::AttributeBuffer> SurfaceTextureScalarQuantity::getAttributeBuffer() {
+  exception("unsupported operation -- cannot get attribute buffer for texture scalar quantity [" + this->name + "]");
+  return std::shared_ptr<render::AttributeBuffer>(nullptr);
+}
 
 } // namespace polyscope

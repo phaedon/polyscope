@@ -20,6 +20,8 @@ PersistentCache<std::vector<std::string>> persistentCache_vectorstring;
 PersistentCache<ParamVizStyle> persistentCache_paramVizStyle;
 PersistentCache<BackFacePolicy> persistentCache_BackFacePolicy;
 PersistentCache<MeshShadeStyle> persistentCache_MeshNormalType;
+PersistentCache<FilterMode> persistentCache_FilterMode;
+PersistentCache<IsolineStyle> persistentCache_IsolineStyle;
 // clang-format on
 } // namespace detail
 } // namespace polyscope

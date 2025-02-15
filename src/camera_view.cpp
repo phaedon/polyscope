@@ -29,6 +29,13 @@ CameraView::CameraView(std::string name, const CameraParameters& params_)
       widgetThickness(uniquePrefix() + "#widgetThickness", 0.02),
       widgetColor(uniquePrefix() + "#widgetColor", glm::vec3{0., 0., 0.}) {
 
+  if (options::warnForInvalidValues) {
+    if (!params.isfinite()) {
+      warning("Invalid +-inf or NaN values detected",
+              "in camera view parameters: " + name + "\n(set warnForInvalidValues=false to disable)");
+    }
+  }
+
   updateObjectSpaceBounds();
 }
 
@@ -274,7 +281,10 @@ void CameraView::fillCameraWidgetGeometry(render::ShaderProgram* nodeProgram, re
     addPolygon({triangleTop, triangleRight, triangleLeft});
 
     pickFrameProgram->setAttribute("a_vertexPositions", positions);
-    // pickFrameProgram->setAttribute("a_vertexNormals", normals); // unused
+    if (pickFrameProgram->hasAttribute("a_vertexNormals")) {
+      // // this is not actually used, but it only gets optimized out on some platforms, not all
+      pickFrameProgram->setAttribute("a_vertexNormals", normals);
+    }
     pickFrameProgram->setAttribute("a_barycoord", bcoord);
 
     size_t nFaces = 7;

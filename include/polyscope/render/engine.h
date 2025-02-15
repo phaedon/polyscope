@@ -36,7 +36,6 @@ enum class DrawMode {
   TriangleStripInstanced,
 };
 
-enum class FilterMode { Nearest = 0, Linear };
 enum class TextureFormat { RGB8 = 0, RGBA8, RG16F, RGB16F, RGBA16F, RGBA32F, RGB32F, R32F, R16F, DEPTH24 };
 enum class RenderBufferType { Color, ColorAlpha, Depth, Float4 };
 enum class DepthMode { Less, LEqual, LEqualReadOnly, Greater, Disable, PassReadOnly };
@@ -207,7 +206,7 @@ class RenderBuffer {
 public:
   // abstract class: use the factory methods from the Engine class
   RenderBuffer(RenderBufferType type_, unsigned int sizeX_, unsigned int sizeY_);
-  virtual ~RenderBuffer(){};
+  virtual ~RenderBuffer() {};
 
   virtual void resize(unsigned int newX, unsigned int newY);
 
@@ -228,7 +227,7 @@ class FrameBuffer {
 public:
   // abstract class: use the factory methods from the Engine class
   FrameBuffer();
-  virtual ~FrameBuffer(){};
+  virtual ~FrameBuffer() {};
 
   virtual void bind() = 0;
   // Bind to this framebuffer so subsequent draw calls will go to it
@@ -347,7 +346,7 @@ class ShaderProgram {
 
 public:
   ShaderProgram(DrawMode dm);
-  virtual ~ShaderProgram(){};
+  virtual ~ShaderProgram() {};
 
 
   // === Store data
@@ -439,11 +438,16 @@ protected:
 class Engine {
 
 public:
-  // Options
+  Engine();
+  virtual ~Engine();
 
   // High-level control
+  virtual void shutdown() {};
   virtual void checkError(bool fatal = false) = 0;
   void buildEngineGui();
+
+  // 'headless' means there is no physical display to actually render to, e.g. when running on a remote server
+  virtual bool isHeadless() { return false; }
 
   virtual void clearDisplay();
   virtual void bindDisplay();
@@ -501,17 +505,24 @@ public:
   virtual bool windowRequestsClose() = 0;
   virtual void pollEvents() = 0;
   virtual bool isKeyPressed(char c) = 0; // for lowercase a-z and 0-9 only
-  virtual int getKeyCode(char c) = 0;    // for lowercase a-z and 0-9 only
   virtual std::string getClipboardText() = 0;
   virtual void setClipboardText(std::string text) = 0;
 
-  // ImGui
+  // === ImGui
+
+  // NOTE: the imgui backend depends on the window manager (e.g. GLFW), so these must be implemented by the lowest-level
+  // concrete engine implementation
   virtual void initializeImGui() = 0;
   virtual void shutdownImGui() = 0;
-  void setImGuiStyle();
-  ImFontAtlas* getImGuiGlobalFontAtlas();
   virtual void ImGuiNewFrame() = 0;
   virtual void ImGuiRender() = 0;
+
+  void setImGuiStyle();
+  ImFontAtlas* getImGuiGlobalFontAtlas();
+
+  // Display an ImGui window showing a texture
+  // WARNING: you must ensure that the texture buffer pointer stays valid until after the ImGui frame is rendered, which
+  // is not until the end of a main loop iteration.
   virtual void showTextureInImGuiWindow(std::string windowName, TextureBuffer* buffer);
 
 
@@ -623,6 +634,11 @@ public:
   ImFont* monoFont = nullptr;
   FrameBuffer* currRenderFramebuffer = nullptr;
 
+  // Manage some resources that we need to preserve because ImGui will use them to render at the end of the frame
+  // This matters if we delete something mid-frame but have already passed a pointer to a texture for imgui to render,
+  // which happens at the end of the frame.
+  void preserveResourceUntilImguiFrameCompletes(std::shared_ptr<TextureBuffer> texture);
+
 protected:
   // TODO Manage a cache of compiled shaders?
 
@@ -657,6 +673,10 @@ protected:
   std::vector<std::string> defaultRules_sceneObject{"GLSL_VERSION", "GLOBAL_FRAGMENT_FILTER"};
   std::vector<std::string> defaultRules_pick{"GLSL_VERSION", "GLOBAL_FRAGMENT_FILTER", "SHADE_COLOR", "LIGHT_PASSTHRU"};
   std::vector<std::string> defaultRules_process{"GLSL_VERSION"};
+
+  // Lists of points to support preserving resources until the end of an ImGUI frame (see note above)
+  void clearResourcesPreservedForImguiFrame();
+  std::vector<std::shared_ptr<TextureBuffer>> resourcesPreservedForImGuiFrame;
 };
 
 

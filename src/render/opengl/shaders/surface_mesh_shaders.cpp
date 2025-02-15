@@ -5,7 +5,7 @@
 
 namespace polyscope {
 namespace render {
-namespace backend_openGL3_glfw {
+namespace backend_openGL3 {
 
 // clang-format off
 
@@ -256,6 +256,30 @@ const ShaderReplacementRule MESH_PROPAGATE_VALUE (
     /* textures */ {}
 );
 
+const ShaderReplacementRule MESH_PROPAGATE_VALUEALPHA (
+    /* rule name */ "MESH_PROPAGATE_VALUEALPHA",
+    { /* replacement sources */
+      {"VERT_DECLARATIONS", R"(
+          in float a_valueAlpha;
+          out float a_valueAlphaToFrag;
+        )"},
+      {"VERT_ASSIGNMENTS", R"(
+          a_valueAlphaToFrag = a_valueAlpha;
+        )"},
+      {"FRAG_DECLARATIONS", R"(
+          in float a_valueAlphaToFrag;
+        )"},
+      {"GENERATE_ALPHA", R"(
+          alphaOut *= clamp(a_valueAlphaToFrag, 0.f, 1.f);
+        )"},
+    },
+    /* uniforms */ {},
+    /* attributes */ {
+      {"a_valueAlpha", RenderDataType::Float},
+    },
+    /* textures */ {}
+);
+
 const ShaderReplacementRule MESH_PROPAGATE_FLAT_VALUE (
     /* rule name */ "MESH_PROPAGATE_FLAT_VALUE",
     { /* replacement sources */
@@ -276,6 +300,65 @@ const ShaderReplacementRule MESH_PROPAGATE_FLAT_VALUE (
     /* uniforms */ {},
     /* attributes */ {
       {"a_value", RenderDataType::Float},
+    },
+    /* textures */ {}
+);
+
+const ShaderReplacementRule MESH_PROPAGATE_VALUE_CORNER_NEAREST (
+    /* rule name */ "MESH_PROPAGATE_VALUE_CORNER_NEAREST",
+    // REQUIRES: barycentric coords
+    { /* replacement sources */
+      {"VERT_DECLARATIONS", R"(
+          in vec3 a_value3;
+          flat out vec3 a_value3ToFrag;
+          out vec3 a_boostedBarycoordsToFrag;
+        )"},
+      {"VERT_ASSIGNMENTS", R"(
+          a_value3ToFrag = a_value3;
+
+          // We want to slightly change the interpolation beyond nearest-vertex: if two
+          // vertices in a triangle have the same value, we want to shade with a staight-line between
+          // them, as if it's nearest to a shared linear function
+          // This is a trick to get that behavior, by adjusting the value of the barycoords before
+          // interpolation (can be shown to work by considering adding the post-interpolated coordinates 
+          // if they match, then doing some algebra to pull it out before interpolation)
+          vec3 boostedBarycoords = a_barycoord;
+          if(a_value3.x == a_value3.y) {
+            boostedBarycoords.x += a_barycoord.y;
+            boostedBarycoords.y += a_barycoord.x;
+          }
+          if(a_value3.y == a_value3.z) {
+            boostedBarycoords.y += a_barycoord.z;
+            boostedBarycoords.z += a_barycoord.y;
+          }
+          if(a_value3.z == a_value3.x) {
+            boostedBarycoords.z += a_barycoord.x;
+            boostedBarycoords.x += a_barycoord.z;
+          }
+
+          // boostedBarycoords.y += a_barycoord.x * float(a_value3.x == a_value3.y);
+          // boostedBarycoords.z += a_barycoord.x * float(a_value3.x == a_value3.z);
+          // boostedBarycoords.x += a_barycoord.y * float(a_value3.y == a_value3.x);
+          // boostedBarycoords.z += a_barycoord.y * float(a_value3.y == a_value3.z);
+          // boostedBarycoords.x += a_barycoord.z * float(a_value3.z == a_value3.x);
+          // boostedBarycoords.y += a_barycoord.z * float(a_value3.z == a_value3.y);
+
+          a_boostedBarycoordsToFrag = boostedBarycoords;
+        )"},
+      {"FRAG_DECLARATIONS", R"(
+          flat in vec3 a_value3ToFrag;
+          in vec3 a_boostedBarycoordsToFrag;
+          float selectMax(vec3 keys, vec3 values);
+        )"},
+      {"GENERATE_SHADE_VALUE", R"(
+          // set the value equal to the entry of the vector corresponding to the largest component
+          // of the barycoords
+          float shadeValue = selectMax(a_boostedBarycoordsToFrag, a_value3ToFrag);
+        )"},
+    },
+    /* uniforms */ {},
+    /* attributes */ {
+      {"a_value3", RenderDataType::Vector3Float},
     },
     /* textures */ {}
 );
@@ -646,6 +729,6 @@ const ShaderReplacementRule MESH_PROPAGATE_PICK_SIMPLE ( // this one does faces 
 
 // clang-format on
 
-} // namespace backend_openGL3_glfw
+} // namespace backend_openGL3
 } // namespace render
 } // namespace polyscope

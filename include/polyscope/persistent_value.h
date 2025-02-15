@@ -142,6 +142,8 @@ extern PersistentCache<std::vector<std::string>> persistentCache_vectorstring;
 extern PersistentCache<ParamVizStyle> persistentCache_paramVizStyle;
 extern PersistentCache<BackFacePolicy> persistentCache_BackFacePolicy;
 extern PersistentCache<MeshShadeStyle> persistentCache_MeshNormalType;
+extern PersistentCache<FilterMode>     persistentCache_FilterMode;
+extern PersistentCache<IsolineStyle>   persistentCache_IsolineStyle;
 
 template<> inline PersistentCache<double>&                   getPersistentCacheRef<double>()                   { return persistentCache_double; }
 template<> inline PersistentCache<float>&                    getPersistentCacheRef<float>()                    { return persistentCache_float; }
@@ -155,6 +157,8 @@ template<> inline PersistentCache<std::vector<std::string>>& getPersistentCacheR
 template<> inline PersistentCache<ParamVizStyle>&            getPersistentCacheRef<ParamVizStyle>()            { return persistentCache_paramVizStyle; }
 template<> inline PersistentCache<BackFacePolicy>&           getPersistentCacheRef<BackFacePolicy>()           { return persistentCache_BackFacePolicy; }
 template<> inline PersistentCache<MeshShadeStyle>&           getPersistentCacheRef<MeshShadeStyle>()           { return persistentCache_MeshNormalType; }
+template<> inline PersistentCache<FilterMode>&               getPersistentCacheRef<FilterMode>()               { return persistentCache_FilterMode; }
+template<> inline PersistentCache<IsolineStyle>&             getPersistentCacheRef<IsolineStyle>()             { return persistentCache_IsolineStyle; }
 }
 // clang-format on
 

@@ -23,6 +23,19 @@ TEST_F(PolyscopeTest, FloatingImageTest) {
     polyscope::show(3);
     im->setShowFullscreen(true);
     polyscope::show(3);
+
+    // try some options
+    im->setIsolinesEnabled(true);
+    polyscope::show(3);
+    im->setIsolineStyle(polyscope::IsolineStyle::Contour);
+    polyscope::show(3);
+
+    // categorical
+    polyscope::ScalarImageQuantity* im2 = polyscope::addScalarImageQuantity(
+        "im scalar cat", dimX, dimY, vals, polyscope::ImageOrigin::UpperLeft, polyscope::DataType::CATEGORICAL);
+    polyscope::show(3);
+    im2->setShowFullscreen(true);
+    polyscope::show(3);
   }
 
   { // ColorImageQuantity
@@ -125,6 +138,14 @@ TEST_F(PolyscopeTest, FloatingRenderImageTest) {
     polyscope::ScalarRenderImageQuantity* im = polyscope::addScalarRenderImageQuantity(
         "render im scalar", dimX, dimY, depthVals, normalValsEmpty, scalarVals, polyscope::ImageOrigin::UpperLeft);
     im->updateBuffers(depthVals, normalValsEmpty, scalarVals);
+    im->setEnabled(true);
+    polyscope::show(3);
+  }
+  { // categorical
+    polyscope::ScalarRenderImageQuantity* im =
+        polyscope::addScalarRenderImageQuantity("render im scalar", dimX, dimY, depthVals, normalVals, scalarVals,
+                                                polyscope::ImageOrigin::UpperLeft, polyscope::DataType::CATEGORICAL);
+    im->updateBuffers(depthVals, normalVals, scalarVals);
     im->setEnabled(true);
     polyscope::show(3);
   }

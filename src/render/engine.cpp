@@ -270,6 +270,10 @@ ShaderProgram::ShaderProgram(DrawMode dm) : drawMode(dm), uniqueID(render::engin
   }
 }
 
+
+Engine::Engine() {}
+Engine::~Engine() {}
+
 void Engine::buildEngineGui() {
 
   ImGui::SetNextItemOpen(false, ImGuiCond_FirstUseEver);
@@ -906,7 +910,7 @@ void Engine::loadDefaultMaterial(std::string name) {
     newMaterial->rules = {"LIGHT_PASSTHRU", "INVERSE_TONEMAP"};
     newMaterial->setUniforms = [&](ShaderProgram& p){ setTonemapUniforms(p); };
 
-  } 
+  }
   else if(name == "mud") {
     newMaterial->supportsRGB = false;
     for(int i = 0; i < 4; i++) {buff[i] = &bindata_mud[0]; buffSize[i] = bindata_mud.size();}
@@ -1106,6 +1110,14 @@ void Engine::loadDefaultColorMap(std::string name) {
   const std::vector<glm::vec3>* buff = nullptr;
   if (name == "viridis") {
     buff = &CM_VIRIDIS;
+  } else if (name == "magma") {
+    buff = &CM_MAGMA;
+  } else if (name == "inferno") {
+    buff = &CM_INFERNO;
+  } else if (name == "plasma") {
+    buff = &CM_PLASMA;
+  } else if (name == "gray") {
+    buff = &CM_GRAY;
   } else if (name == "coolwarm") {
     buff = &CM_COOLWARM;
   } else if (name == "blues") {
@@ -1124,6 +1136,8 @@ void Engine::loadDefaultColorMap(std::string name) {
     buff = &CM_JET;
   } else if (name == "turbo") {
     buff = &CM_TURBO;
+  } else if (name == "hsv") {
+    buff = &CM_HSV;
   } else {
     exception("unrecognized default colormap " + name);
   }
@@ -1136,6 +1150,10 @@ void Engine::loadDefaultColorMap(std::string name) {
 
 void Engine::loadDefaultColorMaps() {
   loadDefaultColorMap("viridis");
+  loadDefaultColorMap("plasma");
+  loadDefaultColorMap("inferno");
+  loadDefaultColorMap("magma");
+  loadDefaultColorMap("gray");
   loadDefaultColorMap("coolwarm");
   loadDefaultColorMap("blues");
   loadDefaultColorMap("reds");
@@ -1145,6 +1163,7 @@ void Engine::loadDefaultColorMaps() {
   loadDefaultColorMap("rainbow");
   loadDefaultColorMap("jet");
   loadDefaultColorMap("turbo");
+  loadDefaultColorMap("hsv");
 }
 
 
@@ -1163,6 +1182,12 @@ void Engine::showTextureInImGuiWindow(std::string windowName, TextureBuffer* buf
 }
 
 ImFontAtlas* Engine::getImGuiGlobalFontAtlas() { return globalFontAtlas; }
+
+void Engine::preserveResourceUntilImguiFrameCompletes(std::shared_ptr<TextureBuffer> texture) {
+  resourcesPreservedForImGuiFrame.push_back(texture);
+}
+
+void Engine::clearResourcesPreservedForImguiFrame() { resourcesPreservedForImGuiFrame.clear(); }
 
 } // namespace render
 } // namespace polyscope

@@ -5,7 +5,7 @@
 
 namespace polyscope {
 namespace render {
-namespace backend_openGL3_glfw {
+namespace backend_openGL3 {
 
 // clang-format off
 
@@ -290,6 +290,48 @@ const ShaderReplacementRule CYLINDER_PROPAGATE_BLEND_VALUE (
     /* textures */ {}
 );
 
+// like propagate value, but takes two values at tip and tail and nearest-endpoint interpolates
+const ShaderReplacementRule CYLINDER_PROPAGATE_NEAREST_VALUE (
+    /* rule name */ "CYLINDER_PROPAGATE_NEAREST_VALUE",
+    { /* replacement sources */
+      {"VERT_DECLARATIONS", R"(
+          in float a_value_tail;
+          in float a_value_tip;
+          out float a_valueTailToGeom;
+          out float a_valueTipToGeom;
+        )"},
+      {"VERT_ASSIGNMENTS", R"(
+          a_valueTailToGeom = a_value_tail;
+          a_valueTipToGeom = a_value_tip;
+        )"},
+      {"GEOM_DECLARATIONS", R"(
+          in float a_valueTailToGeom[];
+          in float a_valueTipToGeom[];
+          out float a_valueTailToFrag;
+          out float a_valueTipToFrag;
+        )"},
+      {"GEOM_PER_EMIT", R"(
+          a_valueTailToFrag = a_valueTailToGeom[0]; 
+          a_valueTipToFrag = a_valueTipToGeom[0]; 
+        )"},
+      {"FRAG_DECLARATIONS", R"(
+          in float a_valueTailToFrag;
+          in float a_valueTipToFrag;
+          float length2(vec3 x);
+        )"},
+      {"GENERATE_SHADE_VALUE", R"(
+          float tEdge = dot(pHit - tailView, tipView - tailView) / length2(tipView - tailView);
+          float shadeValue = tEdge < 0.5 ? a_valueTailToFrag : a_valueTipToFrag;
+        )"},
+    },
+    /* uniforms */ {},
+    /* attributes */ {
+      {"a_value_tail", RenderDataType::Float},
+      {"a_value_tip", RenderDataType::Float},
+    },
+    /* textures */ {}
+);
+
 const ShaderReplacementRule CYLINDER_PROPAGATE_COLOR (
     /* rule name */ "CYLINDER_PROPAGATE_COLOR",
     { /* replacement sources */
@@ -479,6 +521,6 @@ const ShaderReplacementRule CYLINDER_VARIABLE_SIZE (
 
 // clang-format on
 
-} // namespace backend_openGL3_glfw
+} // namespace backend_openGL3
 } // namespace render
 } // namespace polyscope

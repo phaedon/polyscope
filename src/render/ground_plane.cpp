@@ -52,7 +52,7 @@ void GroundPlane::populateGroundPlaneGeometry() {
   glm::vec4 v2{0., 0., 0., 0.}; v2[(iP+1)%3] = sign * 1.;
   glm::vec4 v3{0., 0., 0., 0.}; v3[(iP+2)%3] = sign *-1.;
   glm::vec4 v4{0., 0., 0., 0.}; v4[(iP+1)%3] = sign *-1.;
-  
+
   std::vector<glm::vec4> positions = {
     cVert, v2, v1,
     cVert, v3, v2,
@@ -196,7 +196,18 @@ void GroundPlane::draw(bool isRedraw) {
   double bboxBottom = sign == 1.0 ? std::get<0>(state::boundingBox)[iP] : std::get<1>(state::boundingBox)[iP];
   double bboxHeight = std::get<1>(state::boundingBox)[iP] - std::get<0>(state::boundingBox)[iP];
   double heightEPS = state::lengthScale * 1e-4;
-  double groundHeight = bboxBottom - sign * (options::groundPlaneHeightFactor.asAbsolute() + heightEPS);
+
+  double groundHeight = -777;
+  switch (options::groundPlaneHeightMode) {
+  case GroundPlaneHeightMode::Automatic: {
+    groundHeight = bboxBottom - sign * (options::groundPlaneHeightFactor.asAbsolute() + heightEPS);
+    break;
+  }
+  case GroundPlaneHeightMode::Manual: {
+    groundHeight = options::groundPlaneHeight;
+    break;
+  }
+  }
 
   // Viewport
   glm::vec4 viewport = render::engine->getCurrentViewport();
@@ -387,6 +398,16 @@ void GroundPlane::buildGui() {
     return "";
   };
 
+  auto heightModeName = [](const GroundPlaneHeightMode& m) -> std::string {
+    switch (m) {
+    case GroundPlaneHeightMode::Automatic:
+      return "Automatic";
+    case GroundPlaneHeightMode::Manual:
+      return "Manual";
+    }
+    return "";
+  };
+
   ImGui::SetNextItemOpen(false, ImGuiCond_FirstUseEver);
   if (ImGui::TreeNode("Ground Plane")) {
 
@@ -404,7 +425,39 @@ void GroundPlane::buildGui() {
     }
     ImGui::PopItemWidth();
 
-    if (ImGui::SliderFloat("Height", options::groundPlaneHeightFactor.getValuePtr(), -1.0, 1.0)) requestRedraw();
+    // Height
+    ImGui::PushItemWidth(80);
+    switch (options::groundPlaneHeightMode) {
+    case GroundPlaneHeightMode::Automatic:
+      if (ImGui::SliderFloat("##HeightValue", options::groundPlaneHeightFactor.getValuePtr(), -1.0, 1.0))
+        requestRedraw();
+      break;
+    case GroundPlaneHeightMode::Manual:
+      int iP;
+      float sign;
+      std::tie(iP, sign) = getGroundPlaneAxisAndSign();
+      double bboxBottom = sign == 1.0 ? std::get<0>(state::boundingBox)[iP] : std::get<1>(state::boundingBox)[iP];
+      double bboxHeight = std::get<1>(state::boundingBox)[iP] - std::get<0>(state::boundingBox)[iP];
+      if (ImGui::SliderFloat("##HeightValue", &options::groundPlaneHeight, bboxBottom - 0.5 * bboxHeight,
+                             bboxBottom + bboxHeight)) {
+        requestRedraw();
+      }
+      break;
+    }
+    ImGui::PopItemWidth();
+    ImGui::SameLine();
+    ImGui::PushItemWidth(100);
+    if (ImGui::BeginCombo("Height##Mode", heightModeName(options::groundPlaneHeightMode).c_str())) {
+      for (GroundPlaneHeightMode m : {GroundPlaneHeightMode::Automatic, GroundPlaneHeightMode::Manual}) {
+        std::string mName = heightModeName(m);
+        if (ImGui::Selectable(mName.c_str(), options::groundPlaneHeightMode == m)) {
+          options::groundPlaneHeightMode = m;
+          requestRedraw();
+        }
+      }
+      ImGui::EndCombo();
+    }
+    ImGui::PopItemWidth();
 
     switch (options::groundPlaneMode) {
     case GroundPlaneMode::None:

@@ -325,7 +325,11 @@ public:
 
   // High-level control
   void initialize();
+  virtual void shutdown() override;
   void checkError(bool fatal = false) override;
+
+  // mock backend is always headless
+  virtual bool isHeadless() override { return true; }
 
   void swapDisplayBuffers() override;
   std::vector<unsigned char> readDisplayBuffer() override;
@@ -349,7 +353,6 @@ public:
   bool windowRequestsClose() override;
   void pollEvents() override;
   bool isKeyPressed(char c) override; // for lowercase a-z and 0-9 only
-  int getKeyCode(char c) override;    // for lowercase a-z and 0-9 only
   std::string getClipboardText() override;
   void setClipboardText(std::string text) override;
 

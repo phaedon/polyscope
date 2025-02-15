@@ -9,11 +9,19 @@ namespace options {
 std::string programName = "Polyscope";
 int verbosity = 2;
 std::string printPrefix = "[polyscope] ";
+bool allowHeadlessBackends = false;
 bool errorsThrowExceptions = false;
 bool debugDrawPickBuffer = false;
 int maxFPS = 60;
+
+#ifdef _WIN32
+// set the default vsync to false on windows, to workaround an glfw errors from an alleged driver bug
+bool enableVSync = false;
+#else
 bool enableVSync = true;
-bool usePrefsFile = true;
+#endif
+
+bool usePrefsFile = false;
 bool initializeWithDefaultStructures = true;
 bool alwaysRedraw = false;
 bool autocenterStructures = false;
@@ -22,6 +30,8 @@ bool automaticallyComputeSceneExtents = true;
 bool invokeUserCallbackForNestedShow = false;
 bool giveFocusOnShow = false;
 bool hideWindowAfterShow = true;
+bool warnForInvalidValues = true;
+bool displayMessagePopups = true;
 
 bool screenshotTransparency = true;
 std::string screenshotExtension = ".png";
@@ -31,7 +41,9 @@ std::string screenshotExtension = ".png";
 // Ground plane / shadows
 bool groundPlaneEnabled = true;
 GroundPlaneMode groundPlaneMode = GroundPlaneMode::TileReflection;
+GroundPlaneHeightMode groundPlaneHeightMode = GroundPlaneHeightMode::Automatic;
 ScaledValue<float> groundPlaneHeightFactor = 0;
+float groundPlaneHeight = 0.;
 int shadowBlurIters = 2;
 float shadowDarkness = 0.25;
 
@@ -53,6 +65,8 @@ bool openImGuiWindowForUserCallback = true;
 std::function<void()> configureImGuiStyleCallback = configureImGuiStyle;
 std::function<std::tuple<ImFontAtlas*, ImFont*, ImFont*>()> prepareImGuiFontsCallback = prepareImGuiFonts;
 
+// Backend and low-level options
+int eglDeviceIndex = -1; // means "try all of them"
 
 // enabled by default in debug mode
 #ifndef NDEBUG

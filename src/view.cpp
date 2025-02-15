@@ -13,38 +13,44 @@ using json = nlohmann::json;
 namespace polyscope {
 namespace view {
 
+
 // Storage for state variables
-int windowWidth = 1280;
-int windowHeight = 720;
-int bufferWidth = -1;
-int bufferHeight = -1;
-int initWindowPosX = 20;
-int initWindowPosY = 20;
-bool windowResizable = true;
-NavigateStyle style = NavigateStyle::Turntable;
-UpDir upDir = UpDir::YUp;
-FrontDir frontDir = FrontDir::ZFront;
-double moveScale = 1.0;
+int& bufferWidth = state::globalContext.bufferWidth;
+int& bufferHeight = state::globalContext.bufferHeight;
+int& windowWidth = state::globalContext.windowWidth;
+int& windowHeight = state::globalContext.windowHeight;
+int& initWindowPosX = state::globalContext.initWindowPosX;
+int& initWindowPosY = state::globalContext.initWindowPosY;
+bool& windowResizable = state::globalContext.windowResizable;
+NavigateStyle& style = state::globalContext.navigateStyle;
+UpDir& upDir = state::globalContext.upDir;
+FrontDir& frontDir = state::globalContext.frontDir;
+double& moveScale = state::globalContext.moveScale;
+double& nearClipRatio = state::globalContext.nearClipRatio;
+double& farClipRatio = state::globalContext.farClipRatio;
+std::array<float, 4>& bgColor = state::globalContext.bgColor;
+glm::mat4x4& viewMat = state::globalContext.viewMat;
+double& fov = state::globalContext.fov;
+ProjectionMode& projectionMode = state::globalContext.projectionMode;
+bool& midflight = state::globalContext.midflight;
+float& flightStartTime = state::globalContext.flightStartTime;
+float& flightEndTime = state::globalContext.flightEndTime;
+glm::dualquat& flightTargetViewR = state::globalContext.flightTargetViewR;
+glm::dualquat& flightInitialViewR = state::globalContext.flightInitialViewR;
+glm::vec3& flightTargetViewT = state::globalContext.flightTargetViewT;
+glm::vec3& flightInitialViewT = state::globalContext.flightInitialViewT;
+float& flightTargetFov = state::globalContext.flightTargetFov;
+float& flightInitialFov = state::globalContext.flightInitialFov;
+
+
+// Default values
+const int defaultWindowWidth = 1280;
+const int defaultWindowHeight = 720;
 const double defaultNearClipRatio = 0.005;
 const double defaultFarClipRatio = 20.0;
 const double defaultFov = 45.;
-const double minFov = 5.;
-const double maxFov = 160.;
-double fov = defaultFov;
-double nearClipRatio = defaultNearClipRatio;
-double farClipRatio = defaultFarClipRatio;
-ProjectionMode projectionMode = ProjectionMode::Perspective;
-std::array<float, 4> bgColor{{1.0, 1.0, 1.0, 0.0}};
-
-glm::mat4x4 viewMat;
-
-bool midflight = false;
-float flightStartTime = -1;
-float flightEndTime = -1;
-glm::dualquat flightTargetViewR, flightInitialViewR;
-glm::vec3 flightTargetViewT, flightInitialViewT;
-float flightTargetFov, flightInitialFov;
-
+const double minFov = 5.;   // for UI
+const double maxFov = 160.; // for UI
 
 // Small helpers
 std::string to_string(ProjectionMode mode) {
@@ -81,6 +87,19 @@ std::string to_string(NavigateStyle style) {
   }
 
   return ""; // unreachable
+}
+
+
+std::tuple<int, int> screenCoordsToBufferInds(glm::vec2 screenCoords) {
+
+  int xPos = (screenCoords.x * view::bufferWidth) / view::windowWidth;
+  int yPos = (screenCoords.y * view::bufferHeight) / view::windowHeight;
+
+  // clamp to lie in [0,width),[0,height)
+  xPos = std::max(std::min(xPos, view::bufferWidth - 1), 0);
+  yPos = std::max(std::min(yPos, view::bufferHeight - 1), 0);
+
+  return std::tuple<int, int>(xPos, yPos);
 }
 
 void processRotate(glm::vec2 startP, glm::vec2 endP) {
@@ -278,18 +297,18 @@ void processKeyboardNavigation(ImGuiIO& io) {
 
     glm::vec3 delta{0.f, 0.f, 0.f};
 
-    if (io.KeysDown[render::engine->getKeyCode('a')]) delta.x += 1.f;
-    if (io.KeysDown[render::engine->getKeyCode('d')]) delta.x += -1.f;
-    if (io.KeysDown[render::engine->getKeyCode('q')]) delta.y += 1.f;
-    if (io.KeysDown[render::engine->getKeyCode('e')]) delta.y += -1.f;
-    if (io.KeysDown[render::engine->getKeyCode('w')]) delta.z += 1.f;
-    if (io.KeysDown[render::engine->getKeyCode('s')]) delta.z += -1.f;
+    if (ImGui::IsKeyDown(ImGuiKey_A)) delta.x += 1.f;
+    if (ImGui::IsKeyDown(ImGuiKey_D)) delta.x += -1.f;
+    if (ImGui::IsKeyDown(ImGuiKey_Q)) delta.y += 1.f;
+    if (ImGui::IsKeyDown(ImGuiKey_E)) delta.y += -1.f;
+    if (ImGui::IsKeyDown(ImGuiKey_W)) delta.z += 1.f;
+    if (ImGui::IsKeyDown(ImGuiKey_S)) delta.z += -1.f;
 
     if (glm::length(delta) > 0.) {
       hasMovement = true;
     }
 
-    float movementScale = state::lengthScale * 0.02 * moveScale;
+    float movementScale = state::lengthScale * ImGui::GetIO().DeltaTime * moveScale;
     glm::mat4x4 camSpaceT = glm::translate(glm::mat4x4(1.0), movementScale * delta);
     viewMat = camSpaceT * viewMat;
   }
@@ -414,7 +433,7 @@ void setWindowSize(int width, int height) {
 
 std::tuple<int, int> getWindowSize() { return std::tuple<int, int>(view::windowWidth, view::windowHeight); }
 
-std::tuple<int, int> getBufferSize() { return std::tuple<int, int>(view::bufferWidth, view::bufferWidth); }
+std::tuple<int, int> getBufferSize() { return std::tuple<int, int>(view::bufferWidth, view::bufferHeight); }
 
 void setViewToCamera(const CameraParameters& p) {
   viewMat = p.getE();
@@ -489,13 +508,13 @@ glm::vec3 screenCoordsToWorldRay(glm::vec2 screenCoords) {
   return worldRayDir;
 }
 
-glm::vec3 bufferCoordsToWorldRay(glm::vec2 screenCoords) {
+glm::vec3 bufferCoordsToWorldRay(glm::vec2 bufferCoords) {
 
   glm::mat4 view = getCameraViewMatrix();
   glm::mat4 proj = getCameraPerspectiveMatrix();
   glm::vec4 viewport = {0., 0., view::bufferWidth, view::bufferHeight};
 
-  glm::vec3 screenPos3{screenCoords.x, view::bufferHeight - screenCoords.y, 0.};
+  glm::vec3 screenPos3{bufferCoords.x, view::bufferHeight - bufferCoords.y, 0.};
   glm::vec3 worldPos = glm::unProject(screenPos3, view, proj, viewport);
   glm::vec3 worldRayDir = glm::normalize(glm::vec3(worldPos) - getCameraWorldPosition());
 
@@ -505,9 +524,8 @@ glm::vec3 bufferCoordsToWorldRay(glm::vec2 screenCoords) {
 
 glm::vec3 screenCoordsToWorldPosition(glm::vec2 screenCoords) {
 
-  glm::vec2 bufferCoords{screenCoords.x * static_cast<float>(view::bufferWidth) / static_cast<float>(view::windowWidth),
-                         screenCoords.y * static_cast<float>(view::bufferHeight) /
-                             static_cast<float>(view::windowHeight)};
+  int xInd, yInd;
+  std::tie(xInd, yInd) = screenCoordsToBufferInds(screenCoords);
 
   glm::mat4 view = getCameraViewMatrix();
   glm::mat4 viewInv = glm::inverse(view);
@@ -517,7 +535,7 @@ glm::vec3 screenCoordsToWorldPosition(glm::vec2 screenCoords) {
 
   // query the depth buffer to get depth
   render::FrameBuffer* sceneFramebuffer = render::engine->sceneBuffer.get();
-  float depth = sceneFramebuffer->readDepth(bufferCoords.x, view::bufferHeight - bufferCoords.y);
+  float depth = sceneFramebuffer->readDepth(xInd, view::bufferHeight - yInd);
   if (depth == 1.) {
     // if we didn't hit anything in the depth buffer, just return infinity
     float inf = std::numeric_limits<float>::infinity();

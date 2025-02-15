@@ -5,7 +5,7 @@
 
 namespace polyscope {
 namespace render {
-namespace backend_openGL3_glfw {
+namespace backend_openGL3 {
 
 // clang-format off
 
@@ -386,6 +386,37 @@ const ShaderReplacementRule SPHERE_PROPAGATE_VALUE (
     /* textures */ {}
 );
 
+const ShaderReplacementRule SPHERE_PROPAGATE_VALUEALPHA (
+    /* rule name */ "SPHERE_PROPAGATE_VALUEALPHA",
+    { /* replacement sources */
+      {"VERT_DECLARATIONS", R"(
+          in float a_valueAlpha;
+          out float a_valueAlphaToGeom;
+        )"},
+      {"VERT_ASSIGNMENTS", R"(
+          a_valueAlphaToGeom = a_valueAlpha;
+        )"},
+      {"GEOM_DECLARATIONS", R"(
+          in float a_valueAlphaToGeom[];
+          out float a_valueAlphaToFrag;
+        )"},
+      {"GEOM_PER_EMIT", R"(
+          a_valueAlphaToFrag = a_valueAlphaToGeom[0]; 
+        )"},
+      {"FRAG_DECLARATIONS", R"(
+          in float a_valueAlphaToFrag;
+        )"},
+      {"GENERATE_ALPHA", R"(
+          alphaOut *= clamp(a_valueAlphaToFrag, 0.f, 1.f);
+        )"},
+    },
+    /* uniforms */ {},
+    /* attributes */ {
+      {"a_valueAlpha", RenderDataType::Float},
+    },
+    /* textures */ {}
+);
+
 const ShaderReplacementRule SPHERE_PROPAGATE_VALUE2 (
     /* rule name */ "SPHERE_PROPAGATE_VALUE2",
     { /* replacement sources */
@@ -522,6 +553,6 @@ const ShaderReplacementRule SPHERE_VARIABLE_SIZE (
 
 // clang-format on
 
-} // namespace backend_openGL3_glfw
+} // namespace backend_openGL3
 } // namespace render
 } // namespace polyscope

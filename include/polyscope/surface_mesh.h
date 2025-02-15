@@ -29,6 +29,7 @@ namespace polyscope {
 class SurfaceVertexColorQuantity;
 class SurfaceFaceColorQuantity;
 class SurfaceTextureColorQuantity;
+class SurfaceScalarQuantity;
 class SurfaceVertexScalarQuantity;
 class SurfaceFaceScalarQuantity;
 class SurfaceEdgeScalarQuantity;
@@ -101,6 +102,7 @@ public:
   render::ManagedBuffer<uint32_t> triangleFaceInds;   // on triangulated mesh [3 * nTriFace]
   render::ManagedBuffer<uint32_t> triangleCornerInds; // on triangulated mesh [3 * nTriFace]
   // these next 3 use the ***perm if it has been set
+  render::ManagedBuffer<uint32_t> triangleAllVertexInds;   // on triangulated mesh, all 3 [3 * 3 * nTriFace]
   render::ManagedBuffer<uint32_t> triangleAllEdgeInds;     // on triangulated mesh, all 3 [3 * 3 * nTriFace]
   render::ManagedBuffer<uint32_t> triangleAllHalfedgeInds; // on triangulated mesh, all 3 [3 * 3 * nTriFace]
   render::ManagedBuffer<uint32_t> triangleAllCornerInds;   // on triangulated mesh, all 3 [3 * 3 * nTriFace]
@@ -175,6 +177,13 @@ public:
   void updateVertexPositions(const V& newPositions);
   template <class V>
   void updateVertexPositions2D(const V& newPositions2D);
+
+  // === Set transparency alpha from a scalar quantity
+  // effect is multiplicative with other transparency values
+  // values are clamped to [0,1]
+  void setTransparencyQuantity(SurfaceScalarQuantity* quantity);
+  void setTransparencyQuantity(std::string name);
+  void clearTransparencyQuantity();
 
 
   // === Indexing conventions
@@ -307,6 +316,7 @@ private:
   std::vector<uint32_t> triangleVertexIndsData;      // index of the corresponding vertex
   std::vector<uint32_t> triangleFaceIndsData;        // index of the corresponding original face
   std::vector<uint32_t> triangleCornerIndsData;      // index of the corresponding original corner
+  std::vector<uint32_t> triangleAllVertexIndsData;   // index of the corresponding original vertex
   std::vector<uint32_t> triangleAllEdgeIndsData;     // index of the corresponding original edge
   std::vector<uint32_t> triangleAllHalfedgeIndsData; // index of the corresponding original halfedge
   std::vector<uint32_t> triangleAllCornerIndsData;   // index of the corresponding original corner
@@ -352,6 +362,7 @@ private:
 
   /// == Compute indices & geometry data
   void computeTriangleCornerInds();
+  void computeTriangleAllVertexInds();
   void computeTriangleAllEdgeInds();
   void computeTriangleAllHalfedgeInds();
   void computeTriangleAllCornerInds();
@@ -375,6 +386,13 @@ private:
   void buildEdgeInfoGui(size_t eInd);
   void buildHalfedgeInfoGui(size_t heInd);
   void buildCornerInfoGui(size_t cInd);
+
+  // Manage per-element transparency
+  // which (scalar) quantity to set point size from
+  // TODO make these PersistentValue<>?
+  std::string transparencyQuantityName = "";            // empty string means none
+  SurfaceScalarQuantity& resolveTransparencyQuantity(); // helper
+
 
   // ==== Gui implementation details
 
