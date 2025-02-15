@@ -18,10 +18,10 @@ cc_library(
     deps = [
         "//deps/MarchingCubeCpp:marching_cube",
         "//deps/args/args",
-        "//deps/glad",
+        #"//deps/glad",
         "//deps/stb",
         "@glm",
-        "@imgui-1.86",
+        "@imgui",
         "@nlohmann_json//:json",
     ],
 )
@@ -43,10 +43,10 @@ cc_library(
     strip_include_prefix = "include",
     deps = [
         "//deps/MarchingCubeCpp:marching_cube",
-        "//deps/glad",
+        #"//deps/glad",
         "//deps/stb",
         "@glm",
-        "@imgui-1.86",
+        "@imgui",
         "@nlohmann_json//:json",
     ],
 )
