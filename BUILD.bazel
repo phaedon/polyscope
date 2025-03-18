@@ -12,7 +12,7 @@ cc_library(
         ],
     ),
     defines = [
-        "POLYSCOPE_BACKEND_OPENGL3_GLFW_ENABLED",
+        "POLYSCOPE_BACKEND_OPENGL3_GLFW",
     ],
     strip_include_prefix = "include",
     deps = [
@@ -22,8 +22,8 @@ cc_library(
         "//deps/stb",
         "@glm",
         "@imgui",
-        "@imgui//backends:platform-glfw",
-        "@imgui//backends:renderer-opengl3",
+        #"@imgui//backends:platform-glfw",
+        #"@imgui//backends:renderer-opengl3",
         "@glfw",
         "@nlohmann_json//:json",
     ],
