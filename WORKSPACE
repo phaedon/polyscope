@@ -62,6 +62,6 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 """,
-    strip_prefix = "imgui-1.90.4",
-    urls = ["https://github.com/ocornut/imgui/archive/refs/tags/v1.90.4.tar.gz"],
+    strip_prefix = "imgui-1.91.3",
+    urls = ["https://github.com/ocornut/imgui/archive/refs/tags/v1.91.3.tar.gz"],
 )
