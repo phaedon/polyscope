@@ -518,7 +518,6 @@ public:
   virtual void ImGuiRender() = 0;
 
   void setImGuiStyle();
-  ImFontAtlas* getImGuiGlobalFontAtlas();
 
   // Display an ImGui window showing a texture
   // WARNING: you must ensure that the texture buffer pointer stays valid until after the ImGui frame is rendered, which
@@ -584,7 +583,7 @@ public:
   TransparencyMode getTransparencyMode();
   bool transparencyEnabled();
   virtual void applyTransparencySettings() = 0;
-  void addSlicePlane(std::string uniquePostfix);
+  void addSlicePlane(std::string uniquePostfix); // TODO move slice planes out of the engine
   void removeSlicePlane(std::string uniquePostfix);
   bool slicePlanesEnabled();                     // true if there is at least one slice plane in the scene
   virtual void setFrontFaceCCW(bool newVal) = 0; // true if CCW triangles are considered front-facing; false otherwise
@@ -629,7 +628,7 @@ public:
   bool useAltDisplayBuffer = false; // if true, push final render results offscreen to the alt buffer instead
 
   // Internal windowing and engine details
-  ImFontAtlas* globalFontAtlas = nullptr;
+  virtual void configureImGui() {}; // generates font things
   ImFont* regularFont = nullptr;
   ImFont* monoFont = nullptr;
   FrameBuffer* currRenderFramebuffer = nullptr;
@@ -658,7 +657,6 @@ protected:
   TransparencyMode currLightingTransparencyMode = TransparencyMode::None;
 
   // Helpers
-  void configureImGui();
   void loadDefaultMaterials();
   void loadDefaultMaterial(std::string name);
   std::shared_ptr<TextureBuffer> loadMaterialTexture(float* data, int width, int height);

@@ -66,10 +66,10 @@ TEST_F(PolyscopeTest, PointCloudPick) {
   auto psPoints = registerPointCloud();
 
   // Don't bother trying to actually click on anything, but make sure this doesn't crash
-  polyscope::pick::evaluatePickQuery(77, 88);
+  polyscope::pickAtBufferInds(glm::ivec2(77, 88));
 
   psPoints->setPointRenderMode(polyscope::PointRenderMode::Quad);
-  polyscope::pick::evaluatePickQuery(77, 88);
+  polyscope::pickAtBufferInds(glm::ivec2(77, 88));
 
   polyscope::removeAllStructures();
 }
@@ -103,10 +103,10 @@ TEST_F(PolyscopeTest, PointCloudScalar) {
 
   psPoints->setPointRenderMode(polyscope::PointRenderMode::Quad);
   polyscope::show(3);
-  
+
   q1->setIsolinesEnabled(true);
   polyscope::show(3);
-  
+
   q1->setIsolineStyle(polyscope::IsolineStyle::Contour);
   polyscope::show(3);
 

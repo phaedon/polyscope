@@ -112,11 +112,11 @@ TEST_F(PolyscopeTest, SurfaceMeshPick) {
   auto psMesh = registerTriangleMesh();
 
   // Don't bother trying to actually click on anything, but make sure this doesn't crash
-  polyscope::pick::evaluatePickQuery(77, 88);
+  polyscope::pickAtBufferInds(glm::ivec2(77, 88));
 
   // Do it again with edges enabled
   psMesh->setEdgeWidth(1.0);
-  polyscope::pick::evaluatePickQuery(77, 88);
+  polyscope::pickAtBufferInds(glm::ivec2(77, 88));
 
   polyscope::removeAllStructures();
 }
@@ -222,7 +222,7 @@ TEST_F(PolyscopeTest, SurfaceMeshScalarVertex) {
   auto q1 = psMesh->addVertexScalarQuantity("vScalar", vScalar);
   q1->setEnabled(true);
   polyscope::show(3);
-  
+
   // try some options
   q1->setIsolinesEnabled(true);
   polyscope::show(3);
@@ -605,7 +605,7 @@ TEST_F(PolyscopeTest, SimpleTriangleMeshPick) {
   auto psMesh = registerSimpleTriangleMesh();
 
   // Don't bother trying to actually click on anything, but make sure this doesn't crash
-  polyscope::pick::evaluatePickQuery(77, 88);
+  polyscope::pickAtBufferInds(glm::ivec2(77, 88));
 
   polyscope::removeAllStructures();
 }

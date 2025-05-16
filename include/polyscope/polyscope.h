@@ -60,7 +60,7 @@ void unshow();
 void frameTick();
 
 // Do shutdown work and de-initialize Polyscope
-void shutdown(bool allowMidFrameShutdown=false);
+void shutdown(bool allowMidFrameShutdown = false);
 
 // Returns true if the user has tried to exit the window at the OS level, e.g clicking the close button. Useful for
 // deciding when to exit your control loop when using frameTick()
@@ -128,6 +128,10 @@ Structure* getStructure(std::string type, std::string name = "");
 
 // True if such a structure exists
 bool hasStructure(std::string type, std::string name = "");
+
+// Look up the string type and name for a structure from its pointer
+// (performs a naive search over all structures for now, use sparingly)
+std::tuple<std::string, std::string> lookUpStructure(Structure* structure);
 
 // De-register a structure, of any type. Also removes any quantities associated with the structure
 void removeStructure(Structure* structure, bool errorIfAbsent = false);
