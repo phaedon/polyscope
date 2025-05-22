@@ -20,7 +20,6 @@
 #include "nlohmann/json.hpp"
 using json = nlohmann::json;
 
-
 namespace polyscope {
 
 // Note: Storage for global members lives in state.cpp and options.cpp
