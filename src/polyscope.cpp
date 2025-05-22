@@ -9,7 +9,6 @@
 
 #include "imgui.h"
 
-//#include "imgui/imgui_impl_opengl3.h"
 #include "polyscope/options.h"
 #include "polyscope/pick.h"
 #include "polyscope/render/engine.h"

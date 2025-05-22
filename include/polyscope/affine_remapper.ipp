@@ -31,30 +31,30 @@ template <typename T>
 typename FIELD_MAG<T>::type FIELD_BIGNESS(T x) {
   return x;
 }
-// template <>
-// typename FIELD_MAG<glm::vec3>::type FIELD_BIGNESS(glm::vec3 x) {
-//   return glm::length(x);
-// }
+template <>
+typename FIELD_MAG<glm::vec3>::type FIELD_BIGNESS(glm::vec3 x) {
+  return glm::length(x);
+}
 
 // Multiplicative identity
 template <typename T>
 T FIELD_ONE() {
   return 1;
 }
-// template <>
-// glm::vec3 FIELD_ONE() {
-//   return glm::vec3{1., 1., 1.};
-// }
+template <>
+glm::vec3 FIELD_ONE() {
+  return glm::vec3{1., 1., 1.};
+}
 
 // Additive identity
 template <typename T>
 T FIELD_ZERO() {
   return 0;
 }
-// template <>
-// glm::vec3 FIELD_ZERO() {
-//   return glm::vec3{0., 0., 0.};
-// }
+template <>
+glm::vec3 FIELD_ZERO() {
+  return glm::vec3{0., 0., 0.};
+}
 }; // namespace
 
 

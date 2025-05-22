@@ -18,6 +18,8 @@
 #include "polyscope/volume_grid.h"
 #include "polyscope/volume_mesh.h"
 
+#include "imgui.h"
+
 #include <iostream>
 #include <unordered_set>
 #include <utility>
