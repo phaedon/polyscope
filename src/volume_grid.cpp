@@ -75,8 +75,8 @@ void VolumeGrid::buildCustomUI() {
       ImGui::PushItemWidth(75 * options::uiScale);
       if (ImGui::SliderFloat("Width", &edgeWidth.get(), 0.001, 2.)) {
         // NOTE: this intentionally circumvents the setEdgeWidth() setter to avoid repopulating the buffer as the
-        // slider is dragged---otherwise we repopulate the buffer on every change, which mostly works fine. This is a
-        // lazy solution instead of better state/buffer management. setEdgeWidth(getEdgeWidth());
+        // slider is dragged---otherwise we repopulate the buffer on every change. This is a
+        // lazy solution instead of better state/buffer management.
         edgeWidth.manuallyChanged();
         requestRedraw();
       }
@@ -94,10 +94,12 @@ void VolumeGrid::buildCustomOptionsUI() {
   }
 
   // Shrinky effect
+  ImGui::PushItemWidth(150 * options::uiScale);
   if (ImGui::SliderFloat("Cell Shrink", &cubeSizeFactor.get(), 0.0, 1., "%.3f", ImGuiSliderFlags_Logarithmic)) {
     cubeSizeFactor.manuallyChanged();
     requestRedraw();
   }
+  ImGui::PopItemWidth();
 }
 
 void VolumeGrid::draw() {
@@ -197,14 +199,14 @@ std::vector<std::string> VolumeGrid::addGridCubeRules(std::vector<std::string> i
 
   if (withShade) {
     if (getEdgeWidth() > 0) {
-      initRules.push_back("GRIDCUBE_WIREFRAME");
+      initRules.push_back("GRIDCUBE_PLANE_WIREFRAME");
       // initRules.push_back("WIREFRAME_SIMPLE");
       initRules.push_back("MESH_WIREFRAME");
     }
   }
 
   if (wantsCullPosition()) {
-    initRules.push_back("GRIDCUBE_CULLPOS_FROM_CENTER");
+    initRules.push_back("GRIDCUBE_PLANE_CULLPOS_FROM_CENTER");
   }
 
   return initRules;
@@ -402,8 +404,12 @@ VolumeGrid* VolumeGrid::setMaterial(std::string m) {
 std::string VolumeGrid::getMaterial() { return material.get(); }
 
 VolumeGrid* VolumeGrid::setEdgeWidth(double newVal) {
+  double oldEdgeWidth = edgeWidth.get();
   edgeWidth = newVal;
-  refresh();
+  if ((oldEdgeWidth != 0) != (newVal != 0)) {
+    // if it changed to/from zero, we disabled/enabled edgges, and need a new program
+    refresh();
+  }
   requestRedraw();
   return this;
 }
