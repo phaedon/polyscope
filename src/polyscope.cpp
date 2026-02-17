@@ -1208,6 +1208,18 @@ bool isHeadless() {
   return false;
 }
 
+void removeEverything() {
+  removeAllStructures();
+  removeAllGroups();
+  removeAllSlicePlanes();
+  removeAllTransformationGizmos();
+  clearMessages();
+  state::userCallback = nullptr;
+  state::filesDroppedCallback = nullptr;
+  options::configureImGuiStyleCallback = configureImGuiStyle; // restore defaults
+  options::prepareImGuiFontsCallback = loadBaseFonts;
+}
+
 void shutdown(bool allowMidFrameShutdown) {
   checkInitialized();
 
@@ -1220,16 +1232,7 @@ void shutdown(bool allowMidFrameShutdown) {
     writePrefsFile();
   }
 
-  // Clear out all structures and other scene objects
-  removeAllStructures();
-  removeAllGroups();
-  removeAllSlicePlanes();
-  removeAllTransformationGizmos();
-  clearMessages();
-  state::userCallback = nullptr;
-  state::filesDroppedCallback = nullptr;
-  options::configureImGuiStyleCallback = configureImGuiStyle; // restore defaults
-  options::prepareImGuiFontsCallback = loadBaseFonts;
+  removeEverything();
 
   // Shut down the render engine
   render::engine->shutdown();

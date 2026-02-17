@@ -63,6 +63,10 @@ void frameTick();
 // Do shutdown work and de-initialize Polyscope
 void shutdown(bool allowMidFrameShutdown = false);
 
+// Remove all structures / quantities / groups / slice planes / callbacks / etc, as if Polyscope was just initialized.
+// (But does _not_ reset option & config settings, nor de-initialize the render engine)
+void removeEverything();
+
 // Returns true if the user has tried to exit the window at the OS level, e.g clicking the close button. Useful for
 // deciding when to exit your control loop when using frameTick()
 bool windowRequestsClose();

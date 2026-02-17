@@ -424,6 +424,7 @@ float computeRelativeMotionScale() {
     return state::lengthScale;
   }
   }
+  return -1.; // should be unreachable
 }
 
 void projectCenterToBeValidForView() {
