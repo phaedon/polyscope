@@ -146,6 +146,7 @@ extern PersistentCache<MeshShadeStyle> persistentCache_MeshNormalType;
 extern PersistentCache<FilterMode>     persistentCache_FilterMode;
 extern PersistentCache<IsolineStyle>   persistentCache_IsolineStyle;
 extern PersistentCache<MeshSelectionMode>   persistentCache_MeshSelectionMode;
+extern PersistentCache<SparseVolumeGridRenderMode> persistentCache_SparseVolumeGridRenderMode;
 
 template<> inline PersistentCache<double>&                   getPersistentCacheRef<double>()                   { return persistentCache_double; }
 template<> inline PersistentCache<float>&                    getPersistentCacheRef<float>()                    { return persistentCache_float; }
@@ -163,6 +164,7 @@ template<> inline PersistentCache<MeshShadeStyle>&           getPersistentCacheR
 template<> inline PersistentCache<FilterMode>&               getPersistentCacheRef<FilterMode>()               { return persistentCache_FilterMode; }
 template<> inline PersistentCache<IsolineStyle>&             getPersistentCacheRef<IsolineStyle>()             { return persistentCache_IsolineStyle; }
 template<> inline PersistentCache<MeshSelectionMode>&        getPersistentCacheRef<MeshSelectionMode>()        { return persistentCache_MeshSelectionMode; }
+template<> inline PersistentCache<SparseVolumeGridRenderMode>& getPersistentCacheRef<SparseVolumeGridRenderMode>() { return persistentCache_SparseVolumeGridRenderMode; }
 }
 // clang-format on
 

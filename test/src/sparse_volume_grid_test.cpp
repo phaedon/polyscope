@@ -321,5 +321,32 @@ TEST_F(PolyscopeTest, SparseVolumeGridBasicOptions) {
   psGrid->setCubeSizeFactor(0.5);
   polyscope::show(3);
 
+  // Voxel render mode
+  EXPECT_EQ(psGrid->getRenderMode(), polyscope::SparseVolumeGridRenderMode::Gridcube);
+  psGrid->setRenderMode(polyscope::SparseVolumeGridRenderMode::Wireframe);
+  EXPECT_EQ(psGrid->getRenderMode(), polyscope::SparseVolumeGridRenderMode::Wireframe);
+  polyscope::show(3);
+
+  // Wireframe radius
+  psGrid->setWireframeRadius(2.0);
+  EXPECT_DOUBLE_EQ(psGrid->getWireframeRadius(), 2.0);
+  polyscope::show(3);
+
+  psGrid->setWireframeRadius(0.5);
+  EXPECT_DOUBLE_EQ(psGrid->getWireframeRadius(), 0.5);
+  polyscope::show(3);
+
+  // Wireframe color
+  psGrid->setWireframeColor({1.f, 0.f, 0.f});
+  glm::vec3 wfColor = psGrid->getWireframeColor();
+  EXPECT_FLOAT_EQ(wfColor.x, 1.f);
+  EXPECT_FLOAT_EQ(wfColor.y, 0.f);
+  EXPECT_FLOAT_EQ(wfColor.z, 0.f);
+  polyscope::show(3);
+
+  psGrid->setRenderMode(polyscope::SparseVolumeGridRenderMode::Gridcube);
+  EXPECT_EQ(psGrid->getRenderMode(), polyscope::SparseVolumeGridRenderMode::Gridcube);
+  polyscope::show(3);
+
   polyscope::removeAllStructures();
 }

@@ -5,6 +5,7 @@
 #include "polyscope/sparse_volume_grid_scalar_quantity.h"
 
 #include "polyscope/pick.h"
+#include "polyscope/view.h"
 
 #include "imgui.h"
 
@@ -52,7 +53,10 @@ SparseVolumeGrid::SparseVolumeGrid(std::string name, glm::vec3 origin_, glm::vec
       edgeWidth(           uniquePrefix() + "edgeWidth",         0.f),
       edgeColor(           uniquePrefix() + "edgeColor",         glm::vec3{0., 0., 0.}), 
       material(            uniquePrefix() + "material",          "clay"),
-      cubeSizeFactor(      uniquePrefix() + "cubeSizeFactor",    0.f)
+      cubeSizeFactor(      uniquePrefix() + "cubeSizeFactor",    0.f),
+      renderMode(          uniquePrefix() + "renderMode",        SparseVolumeGridRenderMode::Gridcube),
+      wireframeRadius(     uniquePrefix() + "wireframeRadius",   1.f),
+      wireframeColor(      uniquePrefix() + "wireframeColor",    glm::vec3{0., 0., 0.})
     {
   // clang-format on
   occupiedCellsData = std::move(occupiedCells);
@@ -162,42 +166,64 @@ void SparseVolumeGrid::computeCornerNodeIndices() {
 
 void SparseVolumeGrid::buildCustomUI() {
   ImGui::Text("%llu cells", static_cast<unsigned long long>(nCells()));
-
-  { // Color
-    if (ImGui::ColorEdit3("Color", &color.get()[0], ImGuiColorEditFlags_NoInputs)) setColor(color.get());
+  if (haveCornerNodeIndices) {
+    ImGui::SameLine();
+    ImGui::Text(" %llu nodes", static_cast<unsigned long long>(nNodes()));
   }
 
-  { // Edge options
+  // Gridcube options (only when gridcube mode is active)
+  if (renderMode.get() == SparseVolumeGridRenderMode::Gridcube) {
+    { // Color
+      if (ImGui::ColorEdit3("Color##gridcube", &color.get()[0], ImGuiColorEditFlags_NoInputs)) setColor(color.get());
+    }
+
+    { // Edge options
+      ImGui::SameLine();
+      ImGui::PushItemWidth(100 * options::uiScale);
+      if (edgeWidth.get() == 0.) {
+        bool showEdges = false;
+        if (ImGui::Checkbox("Edges", &showEdges)) {
+          setEdgeWidth(1.);
+        }
+      } else {
+        bool showEdges = true;
+        if (ImGui::Checkbox("Edges", &showEdges)) {
+          setEdgeWidth(0.);
+        }
+
+        // Edge color
+        ImGui::PushItemWidth(100 * options::uiScale);
+        if (ImGui::ColorEdit3("Edge Color", &edgeColor.get()[0], ImGuiColorEditFlags_NoInputs))
+          setEdgeColor(edgeColor.get());
+        ImGui::PopItemWidth();
+
+        // Edge width
+        ImGui::SameLine();
+        ImGui::PushItemWidth(75 * options::uiScale);
+        if (ImGui::SliderFloat("Width", &edgeWidth.get(), 0.001, 2.)) {
+          // NOTE: this intentionally circumvents the setEdgeWidth() setter to avoid repopulating the buffer as the
+          // slider is dragged---otherwise we repopulate the buffer on every change. This is a
+          // lazy solution instead of better state/buffer management.
+          edgeWidth.manuallyChanged();
+          requestRedraw();
+        }
+        ImGui::PopItemWidth();
+      }
+      ImGui::PopItemWidth();
+    }
+  }
+
+  // Wireframe options (only when wireframe mode is active)
+  if (renderMode.get() == SparseVolumeGridRenderMode::Wireframe) {
+    if (ImGui::ColorEdit3("Color##wireframe", &wireframeColor.get()[0], ImGuiColorEditFlags_NoInputs))
+      setWireframeColor(wireframeColor.get());
+
     ImGui::SameLine();
     ImGui::PushItemWidth(100 * options::uiScale);
-    if (edgeWidth.get() == 0.) {
-      bool showEdges = false;
-      if (ImGui::Checkbox("Edges", &showEdges)) {
-        setEdgeWidth(1.);
-      }
-    } else {
-      bool showEdges = true;
-      if (ImGui::Checkbox("Edges", &showEdges)) {
-        setEdgeWidth(0.);
-      }
-
-      // Edge color
-      ImGui::PushItemWidth(100 * options::uiScale);
-      if (ImGui::ColorEdit3("Edge Color", &edgeColor.get()[0], ImGuiColorEditFlags_NoInputs))
-        setEdgeColor(edgeColor.get());
-      ImGui::PopItemWidth();
-
-      // Edge width
-      ImGui::SameLine();
-      ImGui::PushItemWidth(75 * options::uiScale);
-      if (ImGui::SliderFloat("Width", &edgeWidth.get(), 0.001, 2.)) {
-        // NOTE: this intentionally circumvents the setEdgeWidth() setter to avoid repopulating the buffer as the
-        // slider is dragged---otherwise we repopulate the buffer on every change. This is a
-        // lazy solution instead of better state/buffer management.
-        edgeWidth.manuallyChanged();
-        requestRedraw();
-      }
-      ImGui::PopItemWidth();
+    if (ImGui::SliderFloat("Radius##wireframe", &wireframeRadius.get(), 0.01, 10., "%.3f",
+                           ImGuiSliderFlags_Logarithmic)) {
+      wireframeRadius.manuallyChanged();
+      requestRedraw();
     }
     ImGui::PopItemWidth();
   }
@@ -208,6 +234,16 @@ void SparseVolumeGrid::buildCustomOptionsUI() {
   if (render::buildMaterialOptionsGui(material.get())) {
     material.manuallyChanged();
     setMaterial(material.get());
+  }
+
+  // Render mode
+  {
+    int currentMode = static_cast<int>(renderMode.get());
+    ImGui::PushItemWidth(150 * options::uiScale);
+    if (ImGui::Combo("Render Mode", &currentMode, "Gridcube\0Wireframe\0")) {
+      setRenderMode(static_cast<SparseVolumeGridRenderMode>(currentMode));
+    }
+    ImGui::PopItemWidth();
   }
 
   // Shrinky effect
@@ -223,24 +259,62 @@ void SparseVolumeGrid::buildCustomOptionsUI() {
 void SparseVolumeGrid::draw() {
   if (!enabled.get()) return;
 
-  if (dominantQuantity == nullptr) {
-    // if there is no dominant quantity, the structure handles drawing
 
-    // Ensure we have prepared buffers
-    ensureRenderProgramPrepared();
+  switch (renderMode.get()) {
+  case SparseVolumeGridRenderMode::Gridcube: {
+    if (dominantQuantity == nullptr) { // if there is no dominant quantity, the structure handles drawing
+      // Gridcube mode: draw as little cubes
+      ensureRenderProgramPrepared();
 
-    // Set program uniforms
-    setSparseVolumeGridUniforms(*program);
-    program->setUniform("u_baseColor", color.get());
+      // Set program uniforms
+      setSparseVolumeGridUniforms(*program);
+      program->setUniform("u_baseColor", color.get());
 
-    // Draw the actual grid
-    program->draw();
-    render::engine->setBackfaceCull(true);
+      // Draw the actual grid
+      program->draw();
+      render::engine->setBackfaceCull(true);
+    }
+    break;
+  }
+  case SparseVolumeGridRenderMode::Wireframe: {
+    // Wireframe mode: draw as spheres and cylinders
+    // NOTE there is no dominant quantity check here, we draw this no matter what
+    ensureWireframeProgramsPrepared();
+
+    setStructureUniforms(*wireframeNodeProgram);
+    setStructureUniforms(*wireframeEdgeProgram);
+
+    glm::mat4 P = view::getCameraPerspectiveMatrix();
+    glm::mat4 Pinv = glm::inverse(P);
+
+    float halfMinWidth = 0.5f * std::min({gridCellWidth.x, gridCellWidth.y, gridCellWidth.z});
+    float nodeRadius = halfMinWidth * wireframeRadius.get() * 0.08f;
+    float edgeRadius = nodeRadius;
+
+    wireframeNodeProgram->setUniform("u_invProjMatrix", glm::value_ptr(Pinv));
+    wireframeNodeProgram->setUniform("u_viewport", render::engine->getCurrentViewport());
+    wireframeNodeProgram->setUniform("u_pointRadius", nodeRadius);
+    wireframeNodeProgram->setUniform("u_baseColor", wireframeColor.get());
+    render::engine->setMaterialUniforms(*wireframeNodeProgram, material.get());
+
+    wireframeEdgeProgram->setUniform("u_invProjMatrix", glm::value_ptr(Pinv));
+    wireframeEdgeProgram->setUniform("u_viewport", render::engine->getCurrentViewport());
+    wireframeEdgeProgram->setUniform("u_radius", edgeRadius);
+    wireframeEdgeProgram->setUniform("u_baseColor", wireframeColor.get());
+    render::engine->setMaterialUniforms(*wireframeEdgeProgram, material.get());
+
+    wireframeNodeProgram->draw();
+    wireframeEdgeProgram->draw();
+    break;
+  }
   }
 
   // Draw the quantities
-  for (auto& x : quantities) {
-    x.second->draw();
+  if (renderMode.get() == SparseVolumeGridRenderMode::Gridcube) {
+    // quantities on the grid only get drawn in gridcube mode
+    for (auto& x : quantities) {
+      x.second->draw();
+    }
   }
   for (auto& x : floatingQuantities) {
     x.second->draw();
@@ -298,6 +372,108 @@ void SparseVolumeGrid::ensureRenderProgramPrepared() {
   render::engine->setMaterial(*program, material.get());
 }
 
+void SparseVolumeGrid::buildWireframeGeometry(std::vector<glm::vec3>& nodePositionsOut,
+                                              std::vector<glm::vec3>& edgeTailPositionsOut,
+                                              std::vector<glm::vec3>& edgeTipPositionsOut) {
+  size_t n = occupiedCellsData.size();
+
+  // 8 corner positions per cell, 12 edges per cell (naive, no deduplication)
+  nodePositionsOut.clear();
+  nodePositionsOut.reserve(n * 8);
+  edgeTailPositionsOut.clear();
+  edgeTailPositionsOut.reserve(n * 12);
+  edgeTipPositionsOut.clear();
+  edgeTipPositionsOut.reserve(n * 12);
+
+  // The 12 edges of a cube as pairs of corner indices (corner = dx*4 + dy*2 + dz)
+  static const int edgePairs[12][2] = {
+      // edges along x axis (dy,dz fixed)
+      {0, 4},
+      {2, 6},
+      {1, 5},
+      {3, 7},
+      // edges along y axis (dx,dz fixed)
+      {0, 2},
+      {4, 6},
+      {1, 3},
+      {5, 7},
+      // edges along z axis (dx,dy fixed)
+      {0, 1},
+      {4, 5},
+      {2, 3},
+      {6, 7},
+  };
+
+  for (size_t i = 0; i < n; i++) {
+    glm::vec3 cellOrigin = origin + glm::vec3(occupiedCellsData[i]) * gridCellWidth;
+
+    // Build the 8 corner positions
+    glm::vec3 corners[8];
+    for (int dx = 0; dx < 2; dx++) {
+      for (int dy = 0; dy < 2; dy++) {
+        for (int dz = 0; dz < 2; dz++) {
+          int c = dx * 4 + dy * 2 + dz;
+          corners[c] = cellOrigin + glm::vec3(dx, dy, dz) * gridCellWidth;
+        }
+      }
+    }
+
+    for (int c = 0; c < 8; c++) {
+      nodePositionsOut.push_back(corners[c]);
+    }
+
+    for (int e = 0; e < 12; e++) {
+      edgeTailPositionsOut.push_back(corners[edgePairs[e][0]]);
+      edgeTipPositionsOut.push_back(corners[edgePairs[e][1]]);
+    }
+  }
+}
+
+
+void SparseVolumeGrid::ensureWireframeProgramsPrepared() {
+  if (wireframeNodeProgram && wireframeEdgeProgram) return;
+
+  std::vector<glm::vec3> nodePositionsVec, edgeTailPositions, edgeTipPositions;
+  buildWireframeGeometry(nodePositionsVec, edgeTailPositions, edgeTipPositions);
+
+  // Node (sphere) program
+  {
+    // clang-format off
+    wireframeNodeProgram = render::engine->requestShader("RAYCAST_SPHERE",
+        render::engine->addMaterialRules(material.get(), 
+          addStructureRules(
+            { view::getCurrentProjectionModeRaycastRule(),
+              wantsCullPosition() ? "SPHERE_CULLPOS_FROM_CENTER" : "",
+              "SHADE_BASECOLOR"
+            }
+          )
+        )
+      );
+    // clang-format on
+    wireframeNodeProgram->setAttribute("a_position", nodePositionsVec);
+    render::engine->setMaterial(*wireframeNodeProgram, material.get());
+  }
+
+  // Edge (cylinder) program
+  {
+    // clang-format off
+    wireframeEdgeProgram = render::engine->requestShader("RAYCAST_CYLINDER",
+        render::engine->addMaterialRules(material.get(), 
+          addStructureRules(
+            { view::getCurrentProjectionModeRaycastRule(),
+              wantsCullPosition() ? "CYLINDER_CULLPOS_FROM_MID" : "",
+              "SHADE_BASECOLOR"
+            }
+          )
+        )
+      );
+    // clang-format on
+
+    wireframeEdgeProgram->setAttribute("a_position_tail", edgeTailPositions);
+    wireframeEdgeProgram->setAttribute("a_position_tip", edgeTipPositions);
+    render::engine->setMaterial(*wireframeEdgeProgram, material.get());
+  }
+}
 
 void SparseVolumeGrid::ensurePickProgramPrepared() {
   if (pickProgram) return;
@@ -361,6 +537,8 @@ void SparseVolumeGrid::refresh() {
 
   program.reset();
   pickProgram.reset();
+  wireframeNodeProgram.reset();
+  wireframeEdgeProgram.reset();
 }
 
 
@@ -586,6 +764,28 @@ SparseVolumeGrid* SparseVolumeGrid::setCubeSizeFactor(double newVal) {
   return this;
 }
 double SparseVolumeGrid::getCubeSizeFactor() { return cubeSizeFactor.get(); }
+
+SparseVolumeGrid* SparseVolumeGrid::setRenderMode(SparseVolumeGridRenderMode mode) {
+  renderMode = mode;
+  refresh();
+  requestRedraw();
+  return this;
+}
+SparseVolumeGridRenderMode SparseVolumeGrid::getRenderMode() { return renderMode.get(); }
+
+SparseVolumeGrid* SparseVolumeGrid::setWireframeRadius(double newVal) {
+  wireframeRadius = newVal;
+  requestRedraw();
+  return this;
+}
+double SparseVolumeGrid::getWireframeRadius() { return wireframeRadius.get(); }
+
+SparseVolumeGrid* SparseVolumeGrid::setWireframeColor(glm::vec3 val) {
+  wireframeColor = val;
+  requestRedraw();
+  return this;
+}
+glm::vec3 SparseVolumeGrid::getWireframeColor() { return wireframeColor.get(); }
 
 
 void SparseVolumeGrid::setCellGeometryAttributes(render::ShaderProgram& p) {

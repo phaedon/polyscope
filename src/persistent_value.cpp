@@ -24,6 +24,7 @@ PersistentCache<MeshShadeStyle> persistentCache_MeshNormalType;
 PersistentCache<FilterMode> persistentCache_FilterMode;
 PersistentCache<IsolineStyle> persistentCache_IsolineStyle;
 PersistentCache<MeshSelectionMode> persistentCache_MeshSelectionMode;
+PersistentCache<SparseVolumeGridRenderMode> persistentCache_SparseVolumeGridRenderMode;
 // clang-format on
 } // namespace detail
 } // namespace polyscope

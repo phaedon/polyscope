@@ -75,7 +75,7 @@ public:
   // Corner c = dx*4 + dy*2 + dz maps cell[i] -> index in canonical node order
   render::ManagedBuffer<uint32_t> cornerNodeInds[8];
 
-  uint64_t nNodes();
+  uint64_t nNodes(); // NOTE: not populated until nodes are enabled (use ensureHaveCornerNodeIndices() to force this)
   const std::vector<glm::ivec3>& getCanonicalNodeInds();
   void ensureHaveCornerNodeIndices();
 
@@ -148,6 +148,18 @@ public:
   SparseVolumeGrid* setCubeSizeFactor(double newVal);
   double getCubeSizeFactor();
 
+  // Render mode (gridcube or wireframe)
+  SparseVolumeGrid* setRenderMode(SparseVolumeGridRenderMode mode);
+  SparseVolumeGridRenderMode getRenderMode();
+
+  // Wireframe radius as a node-relative value. 1.0 is a reasonable default size.
+  SparseVolumeGrid* setWireframeRadius(double newVal);
+  double getWireframeRadius();
+
+  // Color used for wireframe rendering
+  SparseVolumeGrid* setWireframeColor(glm::vec3 val);
+  glm::vec3 getWireframeColor();
+
 private:
   // Field data
   glm::vec3 origin;
@@ -171,6 +183,9 @@ private:
   PersistentValue<glm::vec3> edgeColor;
   PersistentValue<std::string> material;
   PersistentValue<float> cubeSizeFactor;
+  PersistentValue<SparseVolumeGridRenderMode> renderMode;
+  PersistentValue<float> wireframeRadius;
+  PersistentValue<glm::vec3> wireframeColor;
 
   // Compute cell positions and GPU indices from occupiedCellsData
   void computeCellPositions();
@@ -186,6 +201,13 @@ private:
   // Drawing related things
   std::shared_ptr<render::ShaderProgram> program;
   std::shared_ptr<render::ShaderProgram> pickProgram;
+
+  // Wireframe render mode
+  std::shared_ptr<render::ShaderProgram> wireframeNodeProgram;
+  std::shared_ptr<render::ShaderProgram> wireframeEdgeProgram;
+  void ensureWireframeProgramsPrepared();
+  void buildWireframeGeometry(std::vector<glm::vec3>& nodePositions, std::vector<glm::vec3>& edgeTailPositions,
+                              std::vector<glm::vec3>& edgeTipPositions);
 
   // === Helpers
   void checkForDuplicateCells();

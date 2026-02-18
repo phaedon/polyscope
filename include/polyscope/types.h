@@ -164,6 +164,12 @@ POLYSCOPE_DEFINE_ENUM_NAMES(SparseVolumeGridElement,
     {SparseVolumeGridElement::NODE, "Node"}
 );
 
+enum class SparseVolumeGridRenderMode { Gridcube = 0, Wireframe };
+POLYSCOPE_DEFINE_ENUM_NAMES(SparseVolumeGridRenderMode,
+    {SparseVolumeGridRenderMode::Gridcube, "Gridcube"},
+    {SparseVolumeGridRenderMode::Wireframe, "Wireframe"}
+);
+
 enum class IsolineStyle { Stripe = 0, Contour };
 POLYSCOPE_DEFINE_ENUM_NAMES(IsolineStyle,
     {IsolineStyle::Stripe, "Stripe"},
