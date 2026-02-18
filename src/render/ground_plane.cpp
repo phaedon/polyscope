@@ -364,6 +364,9 @@ void GroundPlane::draw(bool isRedraw) {
     projMat[iP][iP] = 0.;
     projMat[3][iP] = groundHeight;
     view::viewMat = view::viewMat * projMat;
+    view::overrideClipPlanes = true; // set the clip planes manually
+    view::overrideNearClipRelative = view::defaultNearClipRatio;
+    view::overrideFarClipRelative = view::defaultFarClipRatio;
 
     // Draw everything
     render::engine->setDepthMode(DepthMode::Less);
@@ -396,6 +399,7 @@ void GroundPlane::draw(bool isRedraw) {
 
     // Restore original view matrix
     view::viewMat = origViewMat;
+    view::overrideClipPlanes = false;
   }
 
   render::engine->bindSceneBuffer();

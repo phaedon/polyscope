@@ -77,6 +77,11 @@ extern const float defaultNearClipRatio;
 extern const float defaultFarClipRatio;
 extern const float defaultFov;
 
+// Internal details
+extern bool overrideClipPlanes; // used for temporary state changes in render passes, internal use only!
+extern float overrideNearClipRelative;
+extern float overrideFarClipRelative;
+
 // === View methods
 
 // == Get/Set the current camera view in the user's window

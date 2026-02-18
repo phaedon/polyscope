@@ -54,6 +54,12 @@ const float defaultFov = 45.;
 const float minFov = 5.;   // for UI
 const float maxFov = 160.; // for UI
 
+// Internal details
+bool overrideClipPlanes =
+    false; // used only for temporary state changes in render passes, so we do not track in context
+float overrideNearClipRelative = defaultNearClipRatio;
+float overrideFarClipRelative = defaultFarClipRatio;
+
 // Small helpers
 
 namespace { // anonymous helpers
@@ -740,7 +746,12 @@ glm::mat4 getCameraPerspectiveMatrix() {
 
   // Set the clip plane
   float absNearClip, absFarClip;
-  std::tie(absNearClip, absFarClip) = computeClipPlanes();
+  if (overrideClipPlanes) {
+    absNearClip = overrideNearClipRelative * state::lengthScale;
+    absFarClip = overrideFarClipRelative * state::lengthScale;
+  } else {
+    std::tie(absNearClip, absFarClip) = computeClipPlanes();
+  }
 
   float fovRad = glm::radians(fov);
   float aspectRatio = (float)bufferWidth / bufferHeight;
