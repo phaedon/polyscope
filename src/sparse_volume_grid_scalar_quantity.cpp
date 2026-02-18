@@ -93,6 +93,9 @@ void SparseVolumeGridCellScalarQuantity::buildCellInfoGUI(size_t cellInd) {
 // ==========            Node Scalar             ==========
 // ========================================================
 
+// TODO: this currently does not nicely support categorical data. Consider adding a rule for proper nearest
+// interpolation.
+
 SparseVolumeGridNodeScalarQuantity::SparseVolumeGridNodeScalarQuantity(std::string name, SparseVolumeGrid& grid,
                                                                        const std::vector<glm::ivec3>& nodeIndices,
                                                                        const std::vector<float>& nodeValues,
