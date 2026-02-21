@@ -458,15 +458,15 @@ bool ManagedBuffer<T>::deviceBufferTypeIsTexture() {
 template <typename T>
 void ManagedBuffer<T>::checkDeviceBufferTypeIs(DeviceBufferType targetType) {
   if (targetType != deviceBufferType) {
-    exception("ManagedBuffer has wrong type for this operation. Expected " + deviceBufferTypeName(targetType) +
-              " but is " + deviceBufferTypeName(deviceBufferType));
+    exception("ManagedBuffer " + name + " has wrong type for this operation. Expected " +
+              deviceBufferTypeName(targetType) + " but is " + deviceBufferTypeName(deviceBufferType));
   }
 }
 
 template <typename T>
 void ManagedBuffer<T>::checkDeviceBufferTypeIsTexture() {
   if (!deviceBufferTypeIsTexture()) {
-    exception("ManagedBuffer has wrong type for this operation. Expected a Texture1d/2d/3d but is " +
+    exception("ManagedBuffer " + name + " has wrong type for this operation. Expected a Texture1d/2d/3d but is " +
               deviceBufferTypeName(deviceBufferType));
   }
 }
